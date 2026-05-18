@@ -154,7 +154,7 @@ export default function PortariaDashboard() {
       setShowQuickAdd(false);
       setQuickFormData({ name: '', cpf: '', whatsapp: '', type: 'lista', location_id: '' });
     } else {
-      alert('Erro ao cadastrar: ' + error.message);
+      alert('Erro ao cadastrar: ' + (error?.message || 'Desconhecido'));
     }
     setIsAdding(false);
   };
