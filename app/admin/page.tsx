@@ -45,13 +45,14 @@ import {
 import { ptBR } from 'date-fns/locale';
 
 import WhatsAppModal from '@/app/components/WhatsAppModal';
+import EventsManager from './EventsManager';
 
 type Reservation = Database['public']['Tables']['reservations']['Row'];
 type Blacklist = Database['public']['Tables']['blacklist']['Row'];
 type ReservationStatus = 'pending' | 'confirmed' | 'cancelled' | 'completed';
 
 export default function AdminDashboard() {
-  const [view, setView] = useState<'reservations' | 'blacklist'>('reservations');
+  const [view, setView] = useState<'reservations' | 'blacklist' | 'events'>('reservations');
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [blacklist, setBlacklist] = useState<Blacklist[]>([]);
   const [isBlacklistModalOpen, setIsBlacklistModalOpen] = useState(false);
@@ -195,6 +196,12 @@ export default function AdminDashboard() {
             className={`w-full flex items-center gap-4 px-6 py-4 rounded-2xl font-bold uppercase tracking-widest text-xs transition-all ${view === 'blacklist' ? 'bg-red-500 text-white shadow-[0_0_20px_rgba(239,68,68,0.2)]' : 'text-white/40 hover:bg-white/5'}`}
           >
             <ShieldAlert size={18} /> Blacklist
+          </button>
+          <button 
+            onClick={() => setView('events')}
+            className={`w-full flex items-center gap-4 px-6 py-4 rounded-2xl font-bold uppercase tracking-widest text-xs transition-all ${view === 'events' ? 'bg-[#D4AF37] text-black shadow-[0_0_20px_rgba(212,175,55,0.2)]' : 'text-white/40 hover:bg-white/5'}`}
+          >
+            <CalendarDays size={18} /> Eventos
           </button>
           <button 
             onClick={() => router.push('/portaria')}
@@ -383,6 +390,10 @@ export default function AdminDashboard() {
                   </tbody>
                 </table>
               </div>
+            </div>
+          ) : view === 'events' ? (
+            <div className="p-6 lg:p-10 max-w-7xl mx-auto w-full animate-in fade-in slide-in-from-bottom-4">
+              <EventsManager />
             </div>
           ) : (
             /* Blacklist View */

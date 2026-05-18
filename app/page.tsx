@@ -32,9 +32,9 @@ import {
   ShieldAlert
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
-import CalendarPicker from './components/CalendarPicker';
+import EventPicker from './components/EventPicker';
 import SVGMap from './components/SVGMap';
-import { format, parse, isAfter, addHours, differenceInHours, differenceInDays, getDay, startOfWeek, endOfWeek, differenceInYears, parseISO } from 'date-fns';
+import { format, parse, isAfter, addHours, differenceInHours, differenceInDays, getDay, startOfWeek, endOfWeek, differenceInYears, parseISO, startOfToday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cpf as cpfValidator } from 'cpf-cnpj-validator';
 
@@ -71,6 +71,8 @@ export default function NarniaClubPortal() {
   const [hasSearched, setHasSearched] = useState(false);
   const [blacklistAlert, setBlacklistAlert] = useState<any | null>(null);
   const [policyAccepted, setPolicyAccepted] = useState(false);
+  const [events, setEvents] = useState<any[]>([]);
+  const [loadingEvents, setLoadingEvents] = useState(true);
   
   const supabase = createClient();
   const WHATSAPP_NUMBER = "5569999798553";
@@ -116,8 +118,21 @@ export default function NarniaClubPortal() {
     }
   };
 
+  const fetchEvents = async () => {
+    setLoadingEvents(true);
+    const { data } = await supabase
+      .from('events')
+      .select('*')
+      .gte('event_date', format(startOfToday(), 'yyyy-MM-dd'))
+      .order('event_date', { ascending: true });
+    
+    if (data) setEvents(data);
+    setLoadingEvents(false);
+  };
+
   useEffect(() => {
     fetchFullDates();
+    fetchEvents();
   }, []);
 
   useEffect(() => {
@@ -397,12 +412,13 @@ export default function NarniaClubPortal() {
     <div className="divide-y divide-white/5">
       {/* Step 1: Date */}
       <div className="bg-[#0A0A0A]">
-        {renderStepHeader(1, Calendar, "Data", date)}
+        {renderStepHeader(1, Calendar, "Data do Evento", date)}
         {activeStep === 1 && (
           <div className="p-4 animate-in fade-in zoom-in-95 duration-300">
-            <CalendarPicker 
+            <EventPicker 
               selectedDate={date} 
-              disabledDates={fullyBookedDates}
+              events={events}
+              loading={loadingEvents}
               onDateSelect={(d) => { setDate(d); setActiveStep(portalMode === 'lista' ? 5 : 2); }} 
             />
           </div>
