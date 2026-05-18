@@ -192,6 +192,7 @@ export default function NarniaClubPortal() {
       const age = differenceInYears(new Date(), parseISO(formData.birth_date));
       if (age < 18) {
         errors.birth_date = 'Apenas maiores de 18 anos podem reservar';
+        alert('Reserva bloqueada: O Nárnia Club permite a entrada apenas para pessoas com 18 anos ou mais.');
       }
     }
 
@@ -433,7 +434,7 @@ export default function NarniaClubPortal() {
             <div className="p-4 animate-in fade-in zoom-in-95 duration-300">
               <SVGMap 
                 elements={portalMode === 'mesa' ? tableElements : cabinElements} 
-                onSelect={(id) => { setLocationId(id); setActiveStep(3); }}
+                onSelect={(id) => { setLocationId(id); setActiveStep(portalMode === 'mesa' ? 5 : 3); }}
                 selectedId={locationId || undefined}
               />
             </div>
@@ -441,8 +442,8 @@ export default function NarniaClubPortal() {
         </div>
       )}
 
-      {/* Step 3: Guests (Hidden for Lista) */}
-      {portalMode !== 'lista' && (
+      {/* Step 3: Guests (Hidden for Lista and Mesa) */}
+      {portalMode === 'camarote' && (
         <div className="bg-[#0A0A0A]">
           {renderStepHeader(3, Users, "Convidados", guests ? `${guests} pessoas` : '')}
           {activeStep === 3 && (
