@@ -652,7 +652,7 @@ export default function NarniaClubPortal() {
     <div className="min-h-screen bg-black text-white font-sans flex flex-col items-center py-8 px-4 overflow-x-hidden">
       <div className="text-center mb-10 animate-in fade-in slide-in-from-top-4 duration-700">
         <h1 className="text-4xl sm:text-5xl font-serif font-black tracking-[0.3em] uppercase text-[#D4AF37] mb-2 drop-shadow-[0_0_15px_rgba(212,175,55,0.2)]">Nárnia</h1>
-        <p className="text-[10px] font-black tracking-[0.5em] uppercase text-white/20">Cozinha • Bar • Club</p>
+        <p className="text-[10px] font-black tracking-[0.5em] uppercase text-white/20">Festa • Bar • Club</p>
       </div>
 
       <div className="w-full max-w-[440px] bg-[#0A0A0A] rounded-[48px] border border-white/5 shadow-[0_40px_100px_rgba(0,0,0,1)] overflow-hidden flex flex-col min-h-[600px]">

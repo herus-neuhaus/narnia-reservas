@@ -5,7 +5,7 @@ export const metadata: Metadata = {
   title: 'Nárnia Club - Reservas',
   description: 'Sistema de reservas online do Nárnia Club.',
   icons: {
-    icon: '/favicon.ico',
+    icon: '/favicon.jpg',
   },
 };
 

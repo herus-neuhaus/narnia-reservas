@@ -1,10 +1,10 @@
-# Duna Cozinha & Bar - Sistema de Reservas
+# Nárnia Club - Sistema de Reservas
 
-Este é o sistema oficial de reservas e gerenciamento do Duna Cozinha & Bar, construído com Next.js e Supabase.
+Este é o sistema oficial de reservas e gerenciamento do Nárnia Club, construído com Next.js e Supabase.
 
 ## Funcionalidades
 
-- **Reservas Online:** Clientes podem agendar mesas de forma intuitiva.
+- **Reservas Online:** Clientes podem agendar mesas e camarotes de forma intuitiva.
 - **Painel Administrativo:** Gestão completa de reservas, confirmações e cancelamentos.
 - **Integração Supabase:** Banco de dados em tempo real e autenticação segura.
 
@@ -33,4 +33,4 @@ Este é o sistema oficial de reservas e gerenciamento do Duna Cozinha & Bar, con
 
 ## Licença
 
-Exclusivo Duna Cozinha & Bar.
+Exclusivo Nárnia Club.
