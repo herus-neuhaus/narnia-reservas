@@ -18,13 +18,15 @@ import {
   CheckCircle2,
   XCircle,
   CalendarDays,
-  LayoutGrid
+  LayoutGrid,
+  Ticket
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
 import { Database } from '@/lib/supabase/database.types';
 import { format, startOfToday, parseISO, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import QuickAddModal from '@/app/components/QuickAddModal';
 
 type Reservation = Database['public']['Tables']['reservations']['Row'];
 type Blacklist = Database['public']['Tables']['blacklist']['Row'];
@@ -39,14 +41,6 @@ export default function PortariaDashboard() {
   
   // Modal State
   const [showQuickAdd, setShowQuickAdd] = useState(false);
-  const [isAdding, setIsAdding] = useState(false);
-  const [quickFormData, setQuickFormData] = useState({ 
-    name: '', 
-    cpf: '', 
-    whatsapp: '', 
-    type: 'lista' as 'lista' | 'mesa' | 'camarote', 
-    location_id: '' 
-  });
   const [blacklistAlert, setBlacklistAlert] = useState<Blacklist | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
 
@@ -103,66 +97,59 @@ export default function PortariaDashboard() {
     setSearchResult(found || null);
   };
 
+  const getPortoVelhoTime = () => {
+    const now = new Date();
+    const formatter = new Intl.DateTimeFormat('pt-BR', {
+      timeZone: 'America/Porto_Velho',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    });
+    
+    const parts = formatter.formatToParts(now);
+    const getValue = (type: string) => parts.find(p => p.type === type)?.value || '';
+    return `${getValue('year')}-${getValue('month')}-${getValue('day')} ${getValue('hour')}:${getValue('minute')}:${getValue('second')}`;
+  };
+
   const toggleCheckIn = async (id: string, currentStatus: string | null) => {
     const newStatus = currentStatus === 'entered' ? 'pending' : 'entered';
+    const enteredAt = newStatus === 'entered' ? getPortoVelhoTime() : null;
+    
     const { error } = await supabase
       .from('reservations')
-      .update({ check_in_status: newStatus })
+      .update({ 
+        check_in_status: newStatus,
+        entered_at: enteredAt
+      })
       .eq('id', id);
 
     if (!error) {
-      setReservations(reservations.map(r => r.id === id ? { ...r, check_in_status: newStatus } : r));
+      setReservations(reservations.map(r => r.id === id ? { ...r, check_in_status: newStatus, entered_at: enteredAt } : r));
       if (searchResult?.id === id) {
-        setSearchResult({ ...searchResult, check_in_status: newStatus });
+        setSearchResult({ ...searchResult, check_in_status: newStatus, entered_at: enteredAt });
       }
     }
   };
 
-  const handleQuickAdd = async () => {
-    if (!quickFormData.name || !quickFormData.cpf) {
-      alert('Nome e CPF são obrigatórios.');
-      return;
-    }
-
-    // Check Blacklist
-    const isBlocked = blacklist.find(b => b.cpf === quickFormData.cpf);
-    if (isBlocked) {
-      setBlacklistAlert(isBlocked);
-      return;
-    }
-
-    setIsAdding(true);
-    const { data, error } = await supabase
-      .from('reservations')
-      .insert([{
-        name: quickFormData.name,
-        email: `portaria_${quickFormData.cpf}@narnia.com`,
-        cpf: quickFormData.cpf,
-        whatsapp: quickFormData.whatsapp,
-        reservation_date: today,
-        reservation_time: format(new Date(), 'HH:mm'),
-        type: quickFormData.type,
-        location_id: quickFormData.type !== 'lista' ? quickFormData.location_id : null,
-        check_in_status: 'entered',
-        num_guests: 1
-      }])
-      .select()
-      .single();
-
-    if (!error && data) {
-      setReservations([data, ...reservations]);
-      setShowQuickAdd(false);
-      setQuickFormData({ name: '', cpf: '', whatsapp: '', type: 'lista', location_id: '' });
-    } else {
-      alert('Erro ao cadastrar: ' + (error?.message || 'Desconhecido'));
-    }
-    setIsAdding(false);
+  const onQuickAddSuccess = (newRes: Reservation) => {
+    setReservations(prev => [newRes, ...prev]);
   };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
     router.push('/login');
   };
+
+  const filteredReservations = reservations.filter(r => 
+    !searchTerm || 
+    r.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    r.cpf?.replace(/\D/g, '').includes(searchTerm.replace(/\D/g, '')) ||
+    r.whatsapp?.includes(searchTerm)
+  );
 
   return (
     <div className="min-h-screen bg-black font-sans text-white">
@@ -253,6 +240,11 @@ export default function PortariaDashboard() {
                       <div className="flex gap-4 mt-2">
                         <span className="text-xs font-bold uppercase tracking-tighter bg-black/10 px-2 py-0.5 rounded">{searchResult.type} {searchResult.location_id}</span>
                         <span className="text-xs font-bold uppercase tracking-tighter bg-black/10 px-2 py-0.5 rounded">{searchResult.num_guests} Pessoas</span>
+                        {searchResult.check_in_status === 'entered' && searchResult.entered_at && (
+                          <span className="text-xs font-bold uppercase tracking-tighter bg-black/10 px-2 py-0.5 rounded flex items-center gap-1">
+                            <Clock size={12} /> Entrou às {searchResult.entered_at.split(' ')[1]?.substring(0, 5) || searchResult.entered_at}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -306,23 +298,30 @@ export default function PortariaDashboard() {
                 <Loader2 className="animate-spin mb-4" size={40} />
                 <p className="text-xs font-bold uppercase tracking-widest">Sincronizando banco de dados...</p>
               </div>
-            ) : reservations.length === 0 ? (
+            ) : filteredReservations.length === 0 ? (
               <div className="p-20 text-center opacity-20">
                 <AlertCircle className="mx-auto mb-4" size={40} />
-                <p className="text-sm font-bold">Nenhum nome na lista para hoje.</p>
+                <p className="text-sm font-bold">Nenhum resultado encontrado.</p>
               </div>
             ) : (
-              reservations.map((res) => (
+              filteredReservations.map((res) => (
                 <div key={res.id} className="p-5 flex items-center justify-between hover:bg-white/[0.02] transition-all group">
                   <div className="flex items-center gap-4">
                     <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border transition-all ${res.check_in_status === 'entered' ? 'bg-green-500/20 border-green-500/40 text-green-500' : 'bg-white/5 border-white/10 text-white/40'}`}>
-                      {res.type === 'lista' ? <UserPlus size={20} /> : <CalendarDays size={20} />}
+                      {res.type === 'lista' ? <UserPlus size={20} /> : res.type === 'pulseira' ? <Ticket size={20} /> : <CalendarDays size={20} />}
                     </div>
                     <div>
                       <h4 className="font-bold text-sm leading-tight">{res.name}</h4>
-                      <div className="flex gap-3 mt-1">
+                      <div className="flex gap-3 mt-1 items-center">
                         <span className="text-[10px] font-bold uppercase tracking-tighter text-white/30">{res.cpf || 'Sem CPF'}</span>
-                        <span className="text-[10px] font-bold uppercase tracking-tighter text-[#D4AF37]/60">{res.type} {res.location_id}</span>
+                        <span className="text-[10px] font-bold uppercase tracking-tighter text-[#D4AF37]/60">
+                          {res.type === 'camarote' ? 'VIP' : res.type === 'pulseira' ? 'Pulseira' : res.type === 'mesa' ? 'Mesa' : 'Lista'} {res.location_id}
+                        </span>
+                        {res.check_in_status === 'entered' && res.entered_at && (
+                          <span className="text-[10px] font-bold uppercase tracking-tighter text-green-500/80 flex items-center gap-0.5">
+                            • <Clock size={10} /> Entrou às {res.entered_at.split(' ')[1]?.substring(0, 5) || res.entered_at}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -345,121 +344,14 @@ export default function PortariaDashboard() {
 
       </main>
 
-      {/* Quick Registration Modal */}
-      {showQuickAdd && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm animate-in fade-in duration-300">
-          <div className="w-full max-w-lg bg-[#0A0A0A] rounded-[40px] border border-white/10 p-8 shadow-2xl animate-in zoom-in-95 duration-300">
-            <div className="flex justify-between items-center mb-8">
-              <h3 className="text-xl font-bold uppercase tracking-widest text-[#D4AF37]">Cadastro Rápido</h3>
-              <button onClick={() => setShowQuickAdd(false)} className="p-2 hover:bg-white/5 rounded-xl transition-all">
-                <XCircle size={24} className="text-white/20" />
-              </button>
-            </div>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="text-[10px] font-bold uppercase tracking-widest text-white/30 ml-4 mb-1 block">CPF (Obrigatório)</label>
-                <input 
-                  type="text" 
-                  value={quickFormData.cpf}
-                  onChange={(e) => {
-                    const cpf = e.target.value;
-                    setQuickFormData({...quickFormData, cpf});
-                    
-                    // Auto-fill registration if CPF is found in past reservations
-                    if (cpf.replace(/\D/g, '').length >= 11) {
-                      const existing = reservations.find(r => r.cpf === cpf);
-                      if (existing) {
-                        setQuickFormData(prev => ({
-                          ...prev,
-                          name: existing.name || prev.name,
-                          whatsapp: existing.whatsapp || prev.whatsapp
-                        }));
-                      }
-                    }
-                  }}
-                  placeholder="000.000.000-00"
-                  className="w-full px-6 py-4 bg-black border border-white/10 rounded-2xl focus:border-[#D4AF37] outline-none text-white"
-                />
-              </div>
-              <div>
-                <label className="text-[10px] font-bold uppercase tracking-widest text-white/30 ml-4 mb-1 block">Nome Completo</label>
-                <input 
-                  type="text" 
-                  value={quickFormData.name}
-                  onChange={(e) => setQuickFormData({...quickFormData, name: e.target.value})}
-                  className="w-full px-6 py-4 bg-black border border-white/10 rounded-2xl focus:border-[#D4AF37] outline-none text-white"
-                />
-              </div>
-              <div>
-                <label className="text-[10px] font-bold uppercase tracking-widest text-white/30 ml-4 mb-1 block">WhatsApp</label>
-                <input 
-                  type="tel" 
-                  value={quickFormData.whatsapp}
-                  onChange={(e) => setQuickFormData({...quickFormData, whatsapp: e.target.value})}
-                  className="w-full px-6 py-4 bg-black border border-white/10 rounded-2xl focus:border-[#D4AF37] outline-none text-white"
-                />
-              </div>
-
-              <div>
-                <label className="text-[10px] font-bold uppercase tracking-widest text-white/30 ml-4 mb-1 block">Tipo de Acesso</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {[
-                    { id: 'lista', label: 'Lista' },
-                    { id: 'mesa', label: 'Mesa' },
-                    { id: 'camarote', label: 'VIP' }
-                  ].map((t) => (
-                    <button
-                      key={t.id}
-                      onClick={() => setQuickFormData({ ...quickFormData, type: t.id as any, location_id: '' })}
-                      className={`py-3 rounded-xl text-[10px] font-bold uppercase border transition-all ${quickFormData.type === t.id ? 'bg-[#D4AF37] border-[#D4AF37] text-black' : 'bg-black border-white/10 text-white/40'}`}
-                    >
-                      {t.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {quickFormData.type !== 'lista' && (
-                <div className="animate-in fade-in slide-in-from-top-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-white/30 ml-4 mb-1 block">
-                    {quickFormData.type === 'mesa' ? 'Selecionar Mesa Livre' : 'Selecionar Camarote Livre'}
-                  </label>
-                  <div className="grid grid-cols-4 gap-2">
-                    {(quickFormData.type === 'mesa' 
-                      ? Array.from({ length: 12 }, (_, i) => `M${i + 1}`) 
-                      : ['C1', 'C2', 'C3']
-                    ).map((loc) => {
-                      const isOccupied = reservations.some(r => r.location_id === loc);
-                      return (
-                        <button
-                          key={loc}
-                          disabled={isOccupied}
-                          onClick={() => setQuickFormData({ ...quickFormData, location_id: loc })}
-                          className={`py-2 rounded-lg text-xs font-bold transition-all border ${
-                            isOccupied ? 'bg-red-500/20 border-red-500/20 text-red-500/40 cursor-not-allowed' :
-                            quickFormData.location_id === loc ? 'bg-[#D4AF37] border-[#D4AF37] text-black scale-105' : 
-                            'bg-white/5 border-white/10 text-white/60 hover:border-[#D4AF37]/40'
-                          }`}
-                        >
-                          {loc}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-              <button 
-                onClick={handleQuickAdd}
-                disabled={isAdding}
-                className="w-full py-5 bg-[#D4AF37] text-black rounded-3xl font-black uppercase tracking-widest mt-4 shadow-xl hover:bg-[#b8962f] transition-all flex items-center justify-center gap-2"
-              >
-                {isAdding ? <Loader2 className="animate-spin" /> : 'CONCLUIR E ENTRAR'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <QuickAddModal 
+        isOpen={showQuickAdd}
+        onClose={() => setShowQuickAdd(false)}
+        onSuccess={onQuickAddSuccess}
+        onBlocked={setBlacklistAlert}
+        blacklist={blacklist}
+        reservations={reservations}
+      />
 
       {/* Blacklist Alert Modal */}
       {blacklistAlert && (

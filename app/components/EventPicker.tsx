@@ -1,10 +1,11 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { CalendarDays, AlertCircle } from 'lucide-react';
 import { Database } from '@/lib/supabase/database.types';
+import CalendarPicker from './CalendarPicker';
 
 type EventRow = Database['public']['Tables']['events']['Row'];
 
@@ -13,9 +14,18 @@ interface EventPickerProps {
   onDateSelect: (date: string) => void;
   events: EventRow[];
   loading?: boolean;
+  disabledDates?: string[];
 }
 
-export default function EventPicker({ selectedDate, onDateSelect, events, loading = false }: EventPickerProps) {
+export default function EventPicker({ 
+  selectedDate, 
+  onDateSelect, 
+  events, 
+  loading = false,
+  disabledDates = []
+}: EventPickerProps) {
+  const [showCalendar, setShowCalendar] = useState(false);
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center p-12 text-white/40 animate-pulse">
@@ -25,17 +35,73 @@ export default function EventPicker({ selectedDate, onDateSelect, events, loadin
     );
   }
 
+  // Se não houver eventos cadastrados, exibe o calendário diretamente (sem botão de voltar)
   if (!events || events.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center p-12 text-white/40 border-2 border-dashed border-white/10 rounded-3xl m-4">
-        <AlertCircle size={40} className="mb-4 opacity-50 text-[#D4AF37]" />
-        <p className="text-[10px] font-bold uppercase tracking-widest text-center">Nenhum evento agendado<br/>para os próximos dias.</p>
+      <div className="space-y-6 p-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
+        <div className="flex flex-col items-center justify-center p-12 text-white/40 border-2 border-dashed border-white/10 rounded-3xl">
+          <AlertCircle size={40} className="mb-4 opacity-50 text-[#D4AF37]" />
+          <p className="text-[10px] font-bold uppercase tracking-widest text-center">Nenhum evento agendado<br/>para os próximos dias.</p>
+        </div>
+
+        <div className="bg-[#0A0A0A] border border-white/10 p-6 rounded-3xl space-y-4">
+          <div className="flex items-center justify-center gap-3">
+            <CalendarDays size={20} className="text-[#D4AF37]" />
+            <h4 className="text-xs font-black uppercase tracking-widest text-[#D4AF37]">
+              Escolher Data de Funcionamento
+            </h4>
+          </div>
+          <p className="text-[11px] text-white/60 text-center leading-tight">
+            Você pode fazer a sua reserva para quintas, sextas ou sábados mesmo sem um evento publicado ainda.
+          </p>
+          <div className="border border-white/5 p-4 rounded-2xl bg-black/40">
+            <CalendarPicker 
+              selectedDate={selectedDate}
+              onDateSelect={onDateSelect}
+              disabledDates={disabledDates}
+            />
+          </div>
+        </div>
       </div>
     );
   }
 
+  // Se o usuário clicou para ver o calendário personalizado
+  if (showCalendar) {
+    return (
+      <div className="space-y-4 p-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
+        <button 
+          onClick={() => setShowCalendar(false)}
+          className="w-full py-4 bg-white/5 hover:bg-white/10 text-[#D4AF37] rounded-2xl font-bold border border-white/5 transition-all text-[11px] uppercase tracking-widest text-center flex items-center justify-center gap-2"
+        >
+          ← Voltar para Eventos
+        </button>
+
+        <div className="bg-[#0A0A0A] border border-white/10 p-6 rounded-3xl space-y-4">
+          <div className="flex items-center justify-center gap-3">
+            <CalendarDays size={20} className="text-[#D4AF37]" />
+            <h4 className="text-xs font-black uppercase tracking-widest text-[#D4AF37]">
+              Escolher Data de Funcionamento
+            </h4>
+          </div>
+          <p className="text-[11px] text-white/60 text-center leading-tight">
+            Selecione um dia de funcionamento no calendário abaixo (Quinta, Sexta e Sábado):
+          </p>
+          <div className="border border-white/5 p-4 rounded-2xl bg-black/40">
+            <CalendarPicker 
+              selectedDate={selectedDate}
+              onDateSelect={onDateSelect}
+              disabledDates={disabledDates}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Lista normal de eventos
   return (
-    <div className="p-4 space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500 max-h-[60vh] overflow-y-auto custom-scrollbar">
+    <div className="p-4 space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500 max-h-[65vh] overflow-y-auto custom-scrollbar">
       {events.map((event) => {
         const dateObj = parseISO(event.event_date);
         const isSelected = selectedDate === event.event_date;
@@ -88,6 +154,15 @@ export default function EventPicker({ selectedDate, onDateSelect, events, loadin
           </button>
         );
       })}
+
+      {/* Botão para Trocar para a Visualização de Calendário */}
+      <button 
+        onClick={() => setShowCalendar(true)}
+        className="w-full py-4 bg-white/5 hover:bg-white/10 text-white rounded-2xl font-bold border border-white/5 hover:border-[#D4AF37]/30 transition-all text-[11px] uppercase tracking-widest text-center mt-6 flex items-center justify-center gap-2"
+      >
+        <CalendarDays size={16} className="text-[#D4AF37]" />
+        Reservar Outra Data
+      </button>
     </div>
   );
 }

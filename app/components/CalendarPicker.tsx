@@ -29,7 +29,7 @@ interface CalendarPickerProps {
 export default function CalendarPicker({ selectedDate, onDateSelect, disabledDates = [] }: CalendarPickerProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const today = startOfToday();
-  const maxDate = addDaysFns(today, 10); // Permitir agendar apenas até 10 dias no futuro
+  const maxDate = addDaysFns(today, 90); // Permitir agendar até 90 dias no futuro (cerca de 3 meses)
 
   const renderHeader = () => {
     return (
@@ -84,7 +84,12 @@ export default function CalendarPicker({ selectedDate, onDateSelect, disabledDat
         formattedDate = format(day, 'yyyy-MM-dd');
         const cloneDay = day;
         const isFull = disabledDates.includes(formattedDate);
-        const isDisabled = isBefore(day, today) || isAfter(day, maxDate) || isFull;
+        
+        // Nárnia funciona apenas quinta (4), sexta (5) e sábado (6)
+        const dayOfWeek = day.getDay();
+        const isOperatingDay = dayOfWeek === 4 || dayOfWeek === 5 || dayOfWeek === 6;
+        
+        const isDisabled = isBefore(day, today) || isAfter(day, maxDate) || isFull || !isOperatingDay;
         const isSelected = selectedDate === formattedDate;
         const isCurrentMonth = isSameMonth(day, monthStart);
 
@@ -95,7 +100,7 @@ export default function CalendarPicker({ selectedDate, onDateSelect, disabledDat
             onClick={() => onDateSelect(format(cloneDay, 'yyyy-MM-dd'))}
             className={`
               relative h-10 flex items-center justify-center text-xs font-medium rounded-xl transition-all
-              ${isDisabled ? 'text-white/5 cursor-not-allowed' : 'hover:bg-white/5 text-white'}
+              ${isDisabled ? 'text-white/5 cursor-not-allowed opacity-20' : 'hover:bg-white/5 text-white'}
               ${isSelected ? 'bg-[#D4AF37] text-black hover:bg-[#D4AF37]' : ''}
               ${!isCurrentMonth && !isSelected ? 'text-white/10' : ''}
             `}

@@ -45,20 +45,30 @@ import {
 import { ptBR } from 'date-fns/locale';
 
 import WhatsAppModal from '@/app/components/WhatsAppModal';
+import BlacklistModal from '@/app/components/BlacklistModal';
 import EventsManager from './EventsManager';
+import ClientsManager from './ClientsManager';
 
 type Reservation = Database['public']['Tables']['reservations']['Row'];
 type Blacklist = Database['public']['Tables']['blacklist']['Row'];
 type ReservationStatus = 'pending' | 'confirmed' | 'cancelled' | 'completed';
 
 export default function AdminDashboard() {
-  const [view, setView] = useState<'reservations' | 'blacklist' | 'events'>('reservations');
+  const [view, setView] = useState<'reservations' | 'blacklist' | 'events' | 'clientes'>('reservations');
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [blacklist, setBlacklist] = useState<Blacklist[]>([]);
   const [isBlacklistModalOpen, setIsBlacklistModalOpen] = useState(false);
-  const [blacklistFormData, setBlacklistFormData] = useState({ name: '', cpf: '', reason: '', duration: '6' });
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+
+  const formatCPF = (value: string) => {
+    return value
+      .replace(/\D/g, '')
+      .replace(/(\d{3})(\d)/, '$1.$2')
+      .replace(/(\d{3})(\d)/, '$1.$2')
+      .replace(/(\d{3})(\d{1,2})/, '$1-$2')
+      .replace(/(-\d{2})\d+?$/, '$1');
+  };
   
   // WhatsApp Modal State
   const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
@@ -150,7 +160,6 @@ export default function AdminDashboard() {
     if (!error) {
       fetchBlacklist();
       setIsBlacklistModalOpen(false);
-      setBlacklistFormData({ name: '', cpf: '', reason: '', duration: '6' });
     }
   };
 
@@ -192,6 +201,12 @@ export default function AdminDashboard() {
             <CalendarIcon size={18} /> Reservas & Listas
           </button>
           <button 
+            onClick={() => setView('clientes')}
+            className={`w-full flex items-center gap-4 px-6 py-4 rounded-2xl font-bold uppercase tracking-widest text-xs transition-all ${view === 'clientes' ? 'bg-[#D4AF37] text-black shadow-[0_0_20px_rgba(212,175,55,0.2)]' : 'text-white/40 hover:bg-white/5'}`}
+          >
+            <Users size={18} /> Clientes
+          </button>
+          <button 
             onClick={() => setView('blacklist')}
             className={`w-full flex items-center gap-4 px-6 py-4 rounded-2xl font-bold uppercase tracking-widest text-xs transition-all ${view === 'blacklist' ? 'bg-red-500 text-white shadow-[0_0_20px_rgba(239,68,68,0.2)]' : 'text-white/40 hover:bg-white/5'}`}
           >
@@ -228,85 +243,87 @@ export default function AdminDashboard() {
         <header className="p-6 lg:p-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 bg-black/40 backdrop-blur-md border-b border-white/5">
           <div>
             <h2 className="text-3xl font-serif font-black uppercase tracking-tight">
-              {view === 'reservations' ? 'Monitor de Reservas' : 'Gestão de Blacklist'}
+              {view === 'reservations' ? 'Monitor de Reservas' : view === 'blacklist' ? 'Gestão de Blacklist' : view === 'events' ? 'Gestão de Eventos' : 'Base de Clientes'}
             </h2>
             <p className="text-xs font-bold uppercase tracking-widest text-white/30 mt-1">
-              {view === 'reservations' ? `Visualizando ${quickFilter}` : 'Controle de Acesso de Clientes Indesejados'}
+              {view === 'reservations' ? `Visualizando ${quickFilter}` : view === 'blacklist' ? 'Controle de Acesso de Clientes Indesejados' : view === 'events' ? 'Gerenciador de Panfletos e Atrações' : 'Histórico de Frequência e Restrições por CPF'}
             </p>
           </div>
 
-          <div className="flex items-center gap-4 w-full sm:w-auto">
-            <div className="relative flex-1 sm:w-80">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20" size={18} />
-              <input 
-                type="text" placeholder="Pesquisar..." 
-                value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
-                className="w-full pl-12 pr-6 py-4 bg-[#0A0A0A] border border-white/5 rounded-2xl text-sm focus:border-[#D4AF37]/50 focus:ring-1 focus:ring-[#D4AF37]/50 outline-none transition-all"
-              />
-            </div>
-            {view === 'reservations' && (
-              <div className="relative">
-                <button 
-                  onClick={() => setShowDatePicker(!showDatePicker)}
-                  className="p-4 bg-[#0A0A0A] border border-white/5 rounded-2xl hover:border-[#D4AF37]/50 transition-all text-[#D4AF37] flex items-center gap-2"
-                >
-                  <Filter size={20} />
-                  <span className="text-xs font-bold uppercase hidden sm:inline">Personalizado</span>
-                </button>
-
-                <div className="hidden lg:flex items-center gap-1 bg-[#0A0A0A] p-1 rounded-2xl border border-white/5">
-                  {[
-                    { label: 'Hoje', start: startOfToday(), end: startOfToday() },
-                    { label: 'Amanhã', start: startOfTomorrow(), end: startOfTomorrow() },
-                    { label: 'Semana', start: startOfWeek(new Date(), { weekStartsOn: 0 }), end: endOfWeek(new Date(), { weekStartsOn: 0 }) },
-                  ].map((f) => (
-                    <button
-                      key={f.label}
-                      onClick={() => {
-                        setStartDate(format(f.start, 'yyyy-MM-dd'));
-                        setEndDate(format(f.end, 'yyyy-MM-dd'));
-                        setQuickFilter(f.label);
-                      }}
-                      className={`px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${quickFilter === f.label ? 'bg-[#D4AF37] text-black' : 'text-white/40 hover:text-white hover:bg-white/5'}`}
-                    >
-                      {f.label}
-                    </button>
-                  ))}
-                </div>
-                
-                {showDatePicker && (
-                  <div ref={datePickerRef} className="absolute right-0 mt-4 p-6 bg-[#0A0A0A] border border-white/10 rounded-[32px] shadow-2xl z-50 w-72 space-y-4 animate-in fade-in slide-in-from-top-2">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-white/30">Período</p>
-                    <div className="space-y-4">
-                      <div>
-                        <label className="text-[9px] font-bold uppercase text-white/20 ml-1">De</label>
-                        <input 
-                          type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
-                          className="w-full mt-1 bg-black border border-white/5 rounded-xl px-4 py-2 text-sm text-white"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[9px] font-bold uppercase text-white/20 ml-1">Até</label>
-                        <input 
-                          type="date" value={endDate} onChange={e => setEndDate(e.target.value)}
-                          className="w-full mt-1 bg-black border border-white/5 rounded-xl px-4 py-2 text-sm text-white"
-                        />
-                      </div>
-                    </div>
-                    <button 
-                      onClick={() => {
-                        setQuickFilter(`${format(parseISO(startDate), 'dd/MM')} - ${format(parseISO(endDate), 'dd/MM')}`);
-                        setShowDatePicker(false);
-                      }}
-                      className="w-full py-3 bg-[#D4AF37] text-black rounded-xl text-[10px] font-black uppercase tracking-widest"
-                    >
-                      Aplicar Filtro
-                    </button>
-                  </div>
-                )}
+          {(view === 'reservations' || view === 'blacklist') && (
+            <div className="flex items-center gap-4 w-full sm:w-auto">
+              <div className="relative flex-1 sm:w-80">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20" size={18} />
+                <input 
+                  type="text" placeholder="Pesquisar..." 
+                  value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
+                  className="w-full pl-12 pr-6 py-4 bg-[#0A0A0A] border border-white/5 rounded-2xl text-sm focus:border-[#D4AF37]/50 focus:ring-1 focus:ring-[#D4AF37]/50 outline-none transition-all"
+                />
               </div>
-            )}
-          </div>
+              {view === 'reservations' && (
+                <div className="relative">
+                  <button 
+                    onClick={() => setShowDatePicker(!showDatePicker)}
+                    className="p-4 bg-[#0A0A0A] border border-white/5 rounded-2xl hover:border-[#D4AF37]/50 transition-all text-[#D4AF37] flex items-center gap-2"
+                  >
+                    <Filter size={20} />
+                    <span className="text-xs font-bold uppercase hidden sm:inline">Personalizado</span>
+                  </button>
+
+                  <div className="hidden lg:flex items-center gap-1 bg-[#0A0A0A] p-1 rounded-2xl border border-white/5">
+                    {[
+                      { label: 'Hoje', start: startOfToday(), end: startOfToday() },
+                      { label: 'Amanhã', start: startOfTomorrow(), end: startOfTomorrow() },
+                      { label: 'Semana', start: startOfWeek(new Date(), { weekStartsOn: 0 }), end: endOfWeek(new Date(), { weekStartsOn: 0 }) },
+                    ].map((f) => (
+                      <button
+                        key={f.label}
+                        onClick={() => {
+                          setStartDate(format(f.start, 'yyyy-MM-dd'));
+                          setEndDate(format(f.end, 'yyyy-MM-dd'));
+                          setQuickFilter(f.label);
+                        }}
+                        className={`px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${quickFilter === f.label ? 'bg-[#D4AF37] text-black' : 'text-white/40 hover:text-white hover:bg-white/5'}`}
+                      >
+                        {f.label}
+                      </button>
+                    ))}
+                  </div>
+                  
+                  {showDatePicker && (
+                    <div ref={datePickerRef} className="absolute right-0 mt-4 p-6 bg-[#0A0A0A] border border-white/10 rounded-[32px] shadow-2xl z-50 w-72 space-y-4 animate-in fade-in slide-in-from-top-2">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-white/30">Período</p>
+                      <div className="space-y-4">
+                        <div>
+                          <label className="text-[9px] font-bold uppercase text-white/20 ml-1">De</label>
+                          <input 
+                            type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
+                            className="w-full mt-1 bg-black border border-white/5 rounded-xl px-4 py-2 text-sm text-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[9px] font-bold uppercase text-white/20 ml-1">Até</label>
+                          <input 
+                            type="date" value={endDate} onChange={e => setEndDate(e.target.value)}
+                            className="w-full mt-1 bg-black border border-white/5 rounded-xl px-4 py-2 text-sm text-white"
+                          />
+                        </div>
+                      </div>
+                      <button 
+                        onClick={() => {
+                          setQuickFilter(`${format(parseISO(startDate), 'dd/MM')} - ${format(parseISO(endDate), 'dd/MM')}`);
+                          setShowDatePicker(false);
+                        }}
+                        className="w-full py-3 bg-[#D4AF37] text-black rounded-xl text-[10px] font-black uppercase tracking-widest"
+                      >
+                        Aplicar Filtro
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </header>
 
         {/* Content Area */}
@@ -391,8 +408,12 @@ export default function AdminDashboard() {
                 </table>
               </div>
             </div>
+          ) : view === 'clientes' ? (
+            <div className="max-w-7xl mx-auto w-full animate-in fade-in slide-in-from-bottom-4">
+              <ClientsManager />
+            </div>
           ) : view === 'events' ? (
-            <div className="p-6 lg:p-10 max-w-7xl mx-auto w-full animate-in fade-in slide-in-from-bottom-4">
+            <div className="max-w-7xl mx-auto w-full animate-in fade-in slide-in-from-bottom-4">
               <EventsManager />
             </div>
           ) : (
@@ -417,7 +438,11 @@ export default function AdminDashboard() {
                </div>
 
                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                 {blacklist.map(b => (
+                 {blacklist.filter(b => 
+                   !searchTerm ||
+                   b.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                   b.cpf?.replace(/\D/g, '').includes(searchTerm.replace(/\D/g, ''))
+                 ).map(b => (
                    <div key={b.id} className="bg-[#0A0A0A] rounded-[32px] border border-white/5 p-6 hover:border-red-500/40 transition-all">
                       <div className="flex justify-between items-start mb-4">
                         <div className="w-12 h-12 bg-white/5 rounded-xl flex items-center justify-center text-red-500">
@@ -445,76 +470,11 @@ export default function AdminDashboard() {
         </div>
       </main>
 
-      {isBlacklistModalOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm">
-          <div className="w-full max-w-md bg-[#0A0A0A] rounded-[40px] border border-white/10 p-8 shadow-2xl animate-in zoom-in-95 duration-300">
-            <div className="flex justify-between items-center mb-8">
-              <h3 className="text-xl font-bold uppercase tracking-widest text-red-500">Bloquear Cliente</h3>
-              <button onClick={() => setIsBlacklistModalOpen(false)} className="p-2 hover:bg-white/5 rounded-xl">
-                <X size={24} className="text-white/20" />
-              </button>
-            </div>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="text-[10px] font-bold uppercase tracking-widest text-white/30 ml-4 mb-1 block">Nome Completo</label>
-                <input 
-                  type="text" 
-                  value={blacklistFormData.name}
-                  onChange={(e) => setBlacklistFormData({...blacklistFormData, name: e.target.value})}
-                  className="w-full px-6 py-4 bg-black border border-white/10 rounded-2xl focus:border-red-500 outline-none text-white"
-                />
-              </div>
-              <div>
-                <label className="text-[10px] font-bold uppercase tracking-widest text-white/30 ml-4 mb-1 block">CPF</label>
-                <input 
-                  type="text" 
-                  value={blacklistFormData.cpf}
-                  onChange={(e) => setBlacklistFormData({...blacklistFormData, cpf: e.target.value})}
-                  className="w-full px-6 py-4 bg-black border border-white/10 rounded-2xl focus:border-red-500 outline-none text-white"
-                  placeholder="000.000.000-00"
-                />
-              </div>
-              <div>
-                <label className="text-[10px] font-bold uppercase tracking-widest text-white/30 ml-4 mb-1 block">Motivo do Bloqueio</label>
-                <textarea 
-                  value={blacklistFormData.reason}
-                  onChange={(e) => setBlacklistFormData({...blacklistFormData, reason: e.target.value})}
-                  className="w-full px-6 py-4 bg-black border border-white/10 rounded-2xl focus:border-red-500 outline-none text-white min-h-[80px] resize-none"
-                  placeholder="Ex: Brigas, Danos ao local, Inadimplência..."
-                />
-              </div>
-
-              <div>
-                <label className="text-[10px] font-bold uppercase tracking-widest text-white/30 ml-4 mb-1 block">Duração do Bloqueio</label>
-                <div className="grid grid-cols-4 gap-2">
-                  {[
-                    { label: '3 Meses', val: '3' },
-                    { label: '6 Meses', val: '6' },
-                    { label: '12 Meses', val: '12' },
-                    { label: 'Permanente', val: '0' },
-                  ].map((d) => (
-                    <button
-                      key={d.val}
-                      onClick={() => setBlacklistFormData({ ...blacklistFormData, duration: d.val })}
-                      className={`py-3 rounded-xl text-[9px] font-black uppercase transition-all border ${blacklistFormData.duration === d.val ? 'bg-red-500 border-red-500 text-white shadow-lg' : 'bg-black border-white/10 text-white/40'}`}
-                    >
-                      {d.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <button 
-                onClick={() => addToBlacklist(blacklistFormData.cpf, blacklistFormData.name, blacklistFormData.reason, blacklistFormData.duration)}
-                className="w-full py-5 bg-red-500 text-white rounded-3xl font-black uppercase tracking-widest mt-4 shadow-xl hover:bg-red-600 transition-all"
-              >
-                CONFIRMAR BLOQUEIO
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <BlacklistModal 
+        isOpen={isBlacklistModalOpen} 
+        onClose={() => setIsBlacklistModalOpen(false)} 
+        onSuccess={addToBlacklist} 
+      />
 
       {selectedReservation && (
         <WhatsAppModal 

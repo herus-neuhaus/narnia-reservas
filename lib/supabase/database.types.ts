@@ -123,6 +123,7 @@ export type Database = {
           location_id: string | null
           check_in_status: string | null
           expires_at: string | null
+          entered_at: string | null
         }
         Insert: {
           created_at?: string
@@ -145,6 +146,7 @@ export type Database = {
           location_id?: string | null
           check_in_status?: string | null
           expires_at?: string | null
+          entered_at?: string | null
         }
         Update: {
           created_at?: string
@@ -167,6 +169,7 @@ export type Database = {
           location_id?: string | null
           check_in_status?: string | null
           expires_at?: string | null
+          entered_at?: string | null
         }
         Relationships: [
           {

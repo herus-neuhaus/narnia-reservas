@@ -70,24 +70,33 @@ export default function NarniaClubPortal() {
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [blacklistAlert, setBlacklistAlert] = useState<any | null>(null);
+  const [customAlert, setCustomAlert] = useState<{ title: string; message: string; type: 'info' | 'error' | 'warning' } | null>(null);
   const [policyAccepted, setPolicyAccepted] = useState(false);
   const [events, setEvents] = useState<any[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(true);
+  const [isCpfLoading, setIsCpfLoading] = useState(false);
   
   const supabase = createClient();
   const WHATSAPP_NUMBER = "5569999798553";
-
+ 
   const handleSearch = async () => {
     const formattedCpf = formatCPF(searchCpf);
     if (formattedCpf.length < 14) return;
+ 
+    if (!cpfValidator.isValid(formattedCpf)) {
+      setCustomAlert({
+        title: 'CPF Inválido',
+        message: 'Por favor, informe um CPF válido e tente novamente.',
+        type: 'warning'
+      });
+      return;
+    }
+    
     setIsSearching(true);
     setHasSearched(true);
     
     const { data, error } = await supabase
-      .from('reservations')
-      .select('*')
-      .eq('cpf', formattedCpf)
-      .order('reservation_date', { ascending: false });
+      .rpc('get_reservations_by_cpf', { p_cpf: formattedCpf });
 
     if (!error) {
       setUserReservations(data || []);
@@ -103,18 +112,10 @@ export default function NarniaClubPortal() {
 
   const fetchFullDates = async () => {
     const { data } = await supabase
-      .from('reservations')
-      .select('reservation_date, num_guests, status');
+      .rpc('get_fully_booked_dates');
     
     if (data) {
-      const dateTotals: Record<string, number> = {};
-      data.forEach(res => {
-        if ((res.status || 'pending').toLowerCase() !== 'cancelled') {
-          dateTotals[res.reservation_date] = (dateTotals[res.reservation_date] || 0) + (res.num_guests || 0);
-        }
-      });
-      const fullDates = Object.keys(dateTotals).filter(date => dateTotals[date] >= 80);
-      setFullyBookedDates(fullDates);
+      setFullyBookedDates(data.map((d: any) => d.reservation_date));
     }
   };
 
@@ -140,16 +141,10 @@ export default function NarniaClubPortal() {
     
     const fetchReservedLocations = async () => {
       const { data } = await supabase
-        .from('reservations')
-        .select('location_id, status')
-        .eq('reservation_date', date)
-        .in('type', ['mesa', 'camarote']);
+        .rpc('get_reserved_locations', { p_date: date });
       
       if (data) {
-        const taken = data
-          .filter(r => (r.status || 'pending').toLowerCase() !== 'cancelled' && r.location_id)
-          .map(r => r.location_id);
-        setReservedLocations(taken);
+        setReservedLocations(data.map((r: any) => r.location_id));
       }
     };
 
@@ -192,7 +187,11 @@ export default function NarniaClubPortal() {
       const age = differenceInYears(new Date(), parseISO(formData.birth_date));
       if (age < 18) {
         errors.birth_date = 'Apenas maiores de 18 anos podem reservar';
-        alert('Reserva bloqueada: O Nárnia Club permite a entrada apenas para pessoas com 18 anos ou mais.');
+        setCustomAlert({
+          title: 'Acesso Restrito',
+          message: 'O Nárnia Club permite a entrada apenas para pessoas com 18 anos ou mais.',
+          type: 'error'
+        });
       }
     }
 
@@ -245,7 +244,11 @@ export default function NarniaClubPortal() {
     }
 
     if ((portalMode === 'mesa' || portalMode === 'camarote') && !policyAccepted) {
-      alert('Você precisa aceitar a política de reserva para continuar.');
+      setCustomAlert({
+        title: 'Termo de Aceite',
+        message: 'Você precisa aceitar os termos e a política de reserva para continuar.',
+        type: 'info'
+      });
       setIsSubmitting(false);
       return;
     }
@@ -253,9 +256,26 @@ export default function NarniaClubPortal() {
     if (portalMode === 'lista') {
       const alreadyOnList = await checkWeeklyListLimit(formData.cpf);
       if (alreadyOnList) {
-        alert('Este CPF já foi adicionado à lista nesta semana.');
+        setCustomAlert({
+          title: 'CPF Já Cadastrado',
+          message: 'Este CPF já foi adicionado à lista para este evento neste dia.',
+          type: 'warning'
+        });
         setIsSubmitting(false);
         return;
+      }
+    }
+
+    let expiresAt: string | null = null;
+    if (portalMode === 'mesa') {
+      expiresAt = `${date} 23:30:00`;
+    } else if (portalMode === 'camarote') {
+      try {
+        const d = new Date(date + 'T00:00:00');
+        d.setDate(d.getDate() + 1);
+        expiresAt = `${format(d, 'yyyy-MM-dd')} 02:00:00`;
+      } catch (e) {
+        expiresAt = `${date} 02:00:00`;
       }
     }
 
@@ -275,15 +295,19 @@ export default function NarniaClubPortal() {
         notes: notes,
         status: 'pending',
         payment_status: (portalMode === 'mesa' || portalMode === 'camarote') ? 'pending' : 'not_required',
-        payment_amount: (portalMode === 'mesa' || portalMode === 'camarote') ? 100 : 0,
-        expires_at: portalMode === 'mesa' ? `${date} 23:30:00` : null
+        payment_amount: portalMode === 'mesa' ? 100 : portalMode === 'camarote' ? 1000 : 0,
+        expires_at: expiresAt
       }]);
 
     if (!error) {
       setIsSuccess(true);
     } else {
       console.error('Submit Error:', error);
-      alert('Erro ao processar: ' + error.message);
+      setCustomAlert({
+        title: 'Erro ao Processar',
+        message: 'Ocorreu um erro ao processar sua solicitação: ' + error.message,
+        type: 'error'
+      });
     }
     setIsSubmitting(false);
   };
@@ -300,6 +324,7 @@ export default function NarniaClubPortal() {
     setReservedLocations([]);
     setFormData({ name: '', email: '', whatsapp: '', cpf: '', birth_date: '' });
     setFormErrors({});
+    setPortalMode('landing');
   };
 
   // Rendering Helpers
@@ -448,8 +473,8 @@ export default function NarniaClubPortal() {
           {renderStepHeader(3, Users, "Convidados", guests ? `${guests} pessoas` : '')}
           {activeStep === 3 && (
             <div className="p-6 space-y-4 animate-in fade-in zoom-in-95 duration-300">
-              <div className="grid grid-cols-5 gap-2">
-                {[2, 4, 6, 8, 10].map(n => (
+              <div className="grid grid-cols-4 gap-2">
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(n => (
                   <button 
                     key={n}
                     onClick={() => { setGuests(n); setActiveStep(5); }}
@@ -469,7 +494,7 @@ export default function NarniaClubPortal() {
         {renderStepHeader(5, User, "Dados Obrigatórios", formData.name)}
         {activeStep === 5 && (
           <div className="p-6 space-y-4 animate-in fade-in zoom-in-95 duration-300">
-            <div className="space-y-1">
+            <div className="space-y-1 relative">
               <input 
                 type="text" placeholder="CPF" 
                 value={formData.cpf} 
@@ -477,63 +502,166 @@ export default function NarniaClubPortal() {
                   const cpf = formatCPF(e.target.value);
                   setFormData({...formData, cpf});
                   
-                  // Auto-fill if CPF is found in previous reservations
-                  if (cpf.replace(/\D/g, '').length === 11) {
+                  // Auto-fill if CPF is found in previous reservations, otherwise fall back to CPFHub.io
+                  const cleanCpf = cpf.replace(/\D/g, '');
+                  if (cleanCpf.length === 11) {
+                    setIsCpfLoading(true);
                     supabase
-                      .from('reservations')
-                      .select('name, whatsapp, birth_date')
-                      .eq('cpf', cpf)
-                      .order('created_at', { ascending: false })
-                      .limit(1)
-                      .maybeSingle()
-                      .then(({ data }) => {
-                        if (data) {
+                      .rpc('get_reservations_by_cpf', { p_cpf: cpf })
+                      .then(({ data, error }) => {
+                        if (!error && data && data.length > 0) {
+                          const latest = data[0];
+                          setIsCpfLoading(false);
+                          
+                          // Validate age
+                          if (latest.birth_date) {
+                            const age = differenceInYears(new Date(), parseISO(latest.birth_date));
+                            if (age < 18) {
+                              setFormErrors(prev => ({
+                                ...prev,
+                                cpf: 'Apenas maiores de 18 anos podem reservar'
+                              }));
+                              setCustomAlert({
+                                title: 'Acesso Restrito',
+                                message: 'O Nárnia Club permite a entrada apenas para pessoas com 18 anos ou mais.',
+                                type: 'error'
+                              });
+                            } else {
+                              setFormErrors(prev => {
+                                const newErr = { ...prev };
+                                delete newErr.cpf;
+                                delete newErr.birth_date;
+                                return newErr;
+                              });
+                            }
+                          }
+
                           setFormData(prev => ({
                             ...prev,
-                            name: data.name || prev.name,
-                            whatsapp: data.whatsapp || prev.whatsapp,
-                            birth_date: data.birth_date || prev.birth_date
+                            name: latest.name || prev.name,
+                            whatsapp: latest.whatsapp || prev.whatsapp,
+                            birth_date: latest.birth_date || prev.birth_date
                           }));
+                        } else {
+                          // Fall back to CPFHub.io lookup API
+                          fetch(`/api/cpf/${cleanCpf}`)
+                            .then(res => res.json())
+                            .then(resData => {
+                              setIsCpfLoading(false);
+                              if (resData.success && resData.data) {
+                                const info = resData.data;
+                                let birthDateFormatted = '';
+                                if (info.birthDate) {
+                                  const parts = info.birthDate.split('/');
+                                  if (parts.length === 3) {
+                                    birthDateFormatted = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+                                  }
+                                }
+
+                                // Validate age
+                                if (birthDateFormatted) {
+                                  const age = differenceInYears(new Date(), parseISO(birthDateFormatted));
+                                  if (age < 18) {
+                                    setFormErrors(prev => ({
+                                      ...prev,
+                                      cpf: 'Apenas maiores de 18 anos podem reservar'
+                                    }));
+                                    setCustomAlert({
+                                      title: 'Acesso Restrito',
+                                      message: 'O Nárnia Club permite a entrada apenas para pessoas com 18 anos ou mais.',
+                                      type: 'error'
+                                    });
+                                  } else {
+                                    setFormErrors(prev => {
+                                      const newErr = { ...prev };
+                                      delete newErr.cpf;
+                                      delete newErr.birth_date;
+                                      return newErr;
+                                    });
+                                  }
+                                }
+
+                                setFormData(prev => ({
+                                  ...prev,
+                                  // Do not complete the name anymore as requested by the user
+                                  birth_date: birthDateFormatted || prev.birth_date
+                                }));
+                              }
+                            })
+                            .catch(err => {
+                              console.error('Error fetching from CPFHub:', err);
+                              setIsCpfLoading(false);
+                            });
                         }
                       });
                   }
                 }}
                 className={`w-full px-6 py-4 bg-black border rounded-2xl outline-none text-base text-white transition-all ${formErrors.cpf ? 'border-red-500' : 'border-white/10 focus:border-[#D4AF37]'}`}
               />
+              {isCpfLoading && (
+                <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2 text-xs text-[#D4AF37]">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Verificando...</span>
+                </div>
+              )}
               {formErrors.cpf && <p className="text-xs text-red-500 ml-4">{formErrors.cpf}</p>}
             </div>
 
-            <div className="space-y-1">
+            <div className="space-y-1 relative">
               <input 
-                type="text" placeholder="Nome Completo" 
-                value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})}
-                className={`w-full px-6 py-4 bg-black border rounded-2xl outline-none text-base text-white transition-all ${formErrors.name ? 'border-red-500' : 'border-white/10 focus:border-[#D4AF37]'}`}
+                type="text" 
+                placeholder={isCpfLoading ? "Verificando CPF..." : "Nome Completo"} 
+                value={isCpfLoading ? "" : formData.name} 
+                onChange={e => setFormData({...formData, name: e.target.value})}
+                disabled={isCpfLoading}
+                className={`w-full px-6 py-4 bg-black border rounded-2xl outline-none text-base text-white transition-all ${isCpfLoading ? 'opacity-50 animate-pulse border-[#D4AF37]/50 pointer-events-none' : formErrors.name ? 'border-red-500' : 'border-white/10 focus:border-[#D4AF37]'}`}
               />
-              {formErrors.name && <p className="text-xs text-red-500 ml-4">{formErrors.name}</p>}
+              {isCpfLoading && (
+                <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2 text-xs text-white/30">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                </div>
+              )}
+              {!isCpfLoading && formErrors.name && <p className="text-xs text-red-500 ml-4">{formErrors.name}</p>}
             </div>
 
-            <div className="space-y-1">
+            <div className="space-y-1 relative">
               <p className="text-xs font-bold uppercase tracking-widest text-[#D4AF37] ml-4 mb-1">Data de Nascimento</p>
               <input 
                 type="date" 
-                value={formData.birth_date} onChange={e => setFormData({...formData, birth_date: e.target.value})}
-                className={`w-full px-6 py-4 bg-black border rounded-2xl outline-none text-base text-white transition-all ${formErrors.birth_date ? 'border-red-500' : 'border-white/10 focus:border-[#D4AF37]'}`}
+                value={isCpfLoading ? "" : formData.birth_date} 
+                onChange={e => setFormData({...formData, birth_date: e.target.value})}
+                disabled={isCpfLoading}
+                className={`w-full px-6 py-4 bg-black border rounded-2xl outline-none text-base text-white transition-all ${isCpfLoading ? 'opacity-50 animate-pulse border-[#D4AF37]/50 pointer-events-none' : formErrors.birth_date ? 'border-red-500' : 'border-white/10 focus:border-[#D4AF37]'}`}
               />
-              {formErrors.birth_date && <p className="text-xs text-red-500 ml-4">{formErrors.birth_date}</p>}
+              {isCpfLoading && (
+                <div className="absolute right-4 bottom-4 flex items-center gap-2 text-xs text-white/30">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                </div>
+              )}
+              {!isCpfLoading && formErrors.birth_date && <p className="text-xs text-red-500 ml-4">{formErrors.birth_date}</p>}
             </div>
 
-            <div className="space-y-1">
+            <div className="space-y-1 relative">
               <input 
-                type="tel" placeholder="WhatsApp: (69) 99999-9999" 
-                value={formData.whatsapp} onChange={e => setFormData({...formData, whatsapp: formatPhone(e.target.value)})}
-                className={`w-full px-6 py-4 bg-black border rounded-2xl outline-none text-base text-white transition-all ${formErrors.whatsapp ? 'border-red-500' : 'border-white/10 focus:border-[#D4AF37]'}`}
+                type="tel" 
+                placeholder={isCpfLoading ? "Aguarde..." : "Seu WhatsApp: (69) 99999-9999"} 
+                value={isCpfLoading ? "" : formData.whatsapp} 
+                onChange={e => setFormData({...formData, whatsapp: formatPhone(e.target.value)})}
+                disabled={isCpfLoading}
+                className={`w-full px-6 py-4 bg-black border rounded-2xl outline-none text-base text-white transition-all ${isCpfLoading ? 'opacity-50 animate-pulse border-[#D4AF37]/50 pointer-events-none' : formErrors.whatsapp ? 'border-red-500' : 'border-white/10 focus:border-[#D4AF37]'}`}
               />
-              {formErrors.whatsapp && <p className="text-xs text-red-500 ml-4">{formErrors.whatsapp}</p>}
+              {isCpfLoading && (
+                <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2 text-xs text-white/30">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                </div>
+              )}
+              {!isCpfLoading && formErrors.whatsapp && <p className="text-xs text-red-500 ml-4">{formErrors.whatsapp}</p>}
             </div>
 
             <button 
               onClick={() => validateForm() && setActiveStep(6)}
-              className="w-full py-4 bg-[#D4AF37] text-black rounded-2xl font-black uppercase tracking-widest shadow-xl hover:bg-[#b8962f] active:scale-95 transition-all mt-4"
+              disabled={isCpfLoading}
+              className={`w-full py-4 bg-[#D4AF37] text-black rounded-2xl font-black uppercase tracking-widest shadow-xl hover:bg-[#b8962f] active:scale-95 transition-all mt-4 ${isCpfLoading ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''}`}
             >
               Ver Resumo
             </button>
@@ -558,8 +686,10 @@ export default function NarniaClubPortal() {
                 </div>
               )}
               <div className="flex justify-between border-b border-white/5 pb-3">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-white/30">Taxa de Reserva</span>
-                <span className="font-bold text-[#D4AF37]">R$ { (portalMode === 'mesa' || portalMode === 'camarote') ? '100,00' : '0,00'}</span>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-white/30">Taxa / Valor</span>
+                <span className="font-bold text-[#D4AF37]">
+                  {portalMode === 'mesa' ? 'R$ 100,00' : portalMode === 'camarote' ? 'R$ 1.000,00' : 'R$ 0,00'}
+                </span>
               </div>
               
               {(portalMode === 'mesa' || portalMode === 'camarote') && (
@@ -569,9 +699,19 @@ export default function NarniaClubPortal() {
                       <Info size={14} /> Política de Reserva
                     </p>
                     <ul className="text-[11px] text-red-400 font-medium space-y-2 list-disc pl-4">
-                      <li>Taxa de R$ 100,00 obrigatória (100% revertida em consumação).</li>
-                      <li>A reserva é válida rigorosamente até às <span className="font-black underline">23:30</span>.</li>
-                      <li>Em caso de no-show (não comparecimento) após o horário limite, a reserva será cancelada automaticamente e o valor da taxa <span className="font-black underline">não será reembolsado</span>.</li>
+                      {portalMode === 'mesa' ? (
+                        <>
+                          <li>Taxa de R$ 100,00 obrigatória (100% revertida em consumação).</li>
+                          <li>A reserva é válida rigorosamente até às <span className="font-black underline">23:30</span>.</li>
+                          <li>Em caso de no-show (não comparecimento) após o horário limite, a reserva será cancelada automaticamente e o valor da taxa <span className="font-black underline">não será reembolsado</span>.</li>
+                        </>
+                      ) : (
+                        <>
+                          <li>Valor do Camarote: R$ 1.000,00 (R$ 300,00 revertidos em consumação).</li>
+                          <li>A reserva é válida rigorosamente até às <span className="font-black underline">02:00</span> da manhã.</li>
+                          <li>Em caso de no-show (não comparecimento), o cliente perde o valor total pago (<span className="font-black underline">não haverá reembolso</span>).</li>
+                        </>
+                      )}
                     </ul>
                   </div>
                   
@@ -586,7 +726,10 @@ export default function NarniaClubPortal() {
                       <CheckCircle2 className="absolute h-5 w-5 text-black scale-0 peer-checked:scale-75 transition-transform" />
                     </div>
                     <span className="text-[11px] font-bold text-white/60 leading-tight group-hover:text-white transition-colors">
-                      Li e concordo com a política de reserva, horário limite de 23:30 e a regra de não reembolso em caso de atraso.
+                      {portalMode === 'mesa' 
+                        ? "Li e concordo com a política de reserva, horário limite de 23:30 e a regra de não reembolso em caso de atraso."
+                        : "Li e concordo com a política do camarote, horário limite de 02:00 e perda total do valor em caso de no-show."
+                      }
                     </span>
                   </label>
                 </div>
@@ -642,6 +785,7 @@ export default function NarniaClubPortal() {
   ];
 
   if (isSuccess) {
+    const isLista = portalMode === 'lista';
     return (
       <div className="min-h-screen bg-black flex items-center justify-center p-6 text-white text-center">
         <div className="max-w-sm w-full space-y-8 animate-in zoom-in duration-500">
@@ -649,14 +793,27 @@ export default function NarniaClubPortal() {
             <CheckCircle2 size={48} className="text-black" />
           </div>
           <div>
-            <h2 className="text-3xl font-serif font-bold mb-3 uppercase tracking-widest">Sucesso!</h2>
-            <p className="text-white/60 font-medium">Sua solicitação foi processada. Siga as instruções no WhatsApp para finalizar.</p>
+            <h2 className="text-3xl font-serif font-bold mb-3 uppercase tracking-widest text-[#D4AF37]">Sucesso!</h2>
+            {isLista ? (
+              <div className="space-y-4">
+                <p className="text-white font-black uppercase tracking-wider text-sm">Seu nome já está na lista!</p>
+                <p className="text-white/60 font-medium text-xs leading-relaxed">
+                  Lembre-se: o seu acesso com desconto ou benefício é garantido **até as 23:30**. 
+                  <br />
+                  <span className="text-[#D4AF37] font-black block mt-3 uppercase tracking-wider">Após as 23:30, será cobrado o valor normal de bilheteria.</span>
+                </p>
+              </div>
+            ) : (
+              <p className="text-white/60 font-medium">Sua solicitação foi processada. Siga as instruções no WhatsApp para finalizar.</p>
+            )}
           </div>
           <div className="space-y-3">
-            <button onClick={() => window.open(`https://wa.me/${WHATSAPP_NUMBER}`)} className="w-full py-5 bg-[#25D366] rounded-3xl font-black uppercase tracking-widest text-xs flex items-center justify-center gap-2">
-              <MessageCircle size={20} /> Confirmar no WhatsApp
-            </button>
-            <button onClick={resetAll} className="w-full py-5 bg-white/5 rounded-3xl font-black uppercase tracking-widest text-xs text-white/40 hover:text-white">
+            {!isLista && (
+              <button onClick={() => window.open(`https://wa.me/${WHATSAPP_NUMBER}`)} className="w-full py-5 bg-[#25D366] rounded-3xl font-black uppercase tracking-widest text-xs flex items-center justify-center gap-2">
+                <MessageCircle size={20} /> Confirmar no WhatsApp
+              </button>
+            )}
+            <button onClick={resetAll} className="w-full py-5 bg-white/5 rounded-3xl font-black uppercase tracking-widest text-xs text-white/40 hover:text-white border border-white/10">
               Voltar ao Início
             </button>
           </div>
@@ -748,6 +905,50 @@ export default function NarniaClubPortal() {
               ENTENDIDO
             </button>
             <p className="mt-6 text-[10px] font-bold text-white/20 uppercase tracking-widest">Dúvidas? Entre em contato via WhatsApp</p>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Alert Modal */}
+      {customAlert && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/95 backdrop-blur-xl animate-in fade-in duration-300">
+          <div className={`w-full max-w-md bg-[#0A0A0A] rounded-[40px] border-2 p-10 text-center animate-in zoom-in-95 duration-300 ${
+            customAlert.type === 'error' ? 'border-red-500/50 shadow-[0_0_50px_rgba(239,68,68,0.2)]' :
+            customAlert.type === 'warning' ? 'border-[#D4AF37]/50 shadow-[0_0_50px_rgba(212,175,55,0.2)]' :
+            'border-white/20 shadow-[0_0_50px_rgba(255,255,255,0.05)]'
+          }`}>
+            <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg ${
+              customAlert.type === 'error' ? 'bg-red-500 text-white shadow-red-500/30' :
+              customAlert.type === 'warning' ? 'bg-[#D4AF37] text-black shadow-[#D4AF37]/30' :
+              'bg-white/10 text-white shadow-white/5'
+            }`}>
+              {customAlert.type === 'error' && <AlertCircle size={40} />}
+              {customAlert.type === 'warning' && <AlertTriangle size={40} />}
+              {customAlert.type === 'info' && <Info size={40} />}
+            </div>
+            
+            <h2 className={`text-2xl font-black uppercase tracking-tighter mb-3 ${
+              customAlert.type === 'error' ? 'text-red-500' :
+              customAlert.type === 'warning' ? 'text-[#D4AF37]' :
+              'text-white'
+            }`}>
+              {customAlert.title}
+            </h2>
+            
+            <p className="text-white/60 text-sm font-medium leading-relaxed mb-8 px-2">
+              {customAlert.message}
+            </p>
+
+            <button 
+              onClick={() => setCustomAlert(null)}
+              className={`w-full py-5 rounded-[24px] font-black uppercase tracking-widest transition-all active:scale-95 shadow-xl ${
+                customAlert.type === 'error' ? 'bg-red-500 hover:bg-red-600 text-white shadow-red-500/20' :
+                customAlert.type === 'warning' ? 'bg-[#D4AF37] hover:bg-[#b8962f] text-black shadow-[#D4AF37]/20' :
+                'bg-white/10 hover:bg-white/15 text-white shadow-white/5'
+              }`}
+            >
+              Entendido
+            </button>
           </div>
         </div>
       )}
