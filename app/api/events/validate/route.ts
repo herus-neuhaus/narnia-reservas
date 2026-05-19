@@ -15,16 +15,40 @@ async function validateDate(date: string, cpf?: string | null) {
       ? `${cleanCpf.slice(0, 3)}.${cleanCpf.slice(3, 6)}.${cleanCpf.slice(6, 9)}-${cleanCpf.slice(9, 11)}`
       : cpf;
 
-    const { data: existingReservation, error: dupError } = await supabase
-      .from('reservations')
+    // Buscar se o cliente existe na tabela customers
+    const { data: customer } = await supabase
+      .from('customers')
       .select('id')
       .or(`cpf.eq."${cleanCpf}",cpf.eq."${formattedCpf}"`)
-      .eq('reservation_date', date)
-      .neq('status', 'cancelled')
       .maybeSingle();
 
-    if (dupError) {
-      throw dupError;
+    let existingReservation = null;
+
+    if (customer) {
+      const { data: resByCustomer, error: resError } = await supabase
+        .from('reservations')
+        .select('id')
+        .eq('customer_id', customer.id)
+        .eq('reservation_date', date)
+        .neq('status', 'cancelled')
+        .maybeSingle();
+
+      if (resError) throw resError;
+      existingReservation = resByCustomer;
+    }
+
+    // Se não encontrou por customer_id, buscar pela coluna CPF legada para retrocompatibilidade
+    if (!existingReservation) {
+      const { data: resByCpfLegacy, error: legacyError } = await supabase
+        .from('reservations')
+        .select('id')
+        .or(`cpf.eq."${cleanCpf}",cpf.eq."${formattedCpf}"`)
+        .eq('reservation_date', date)
+        .neq('status', 'cancelled')
+        .maybeSingle();
+
+      if (legacyError) throw legacyError;
+      existingReservation = resByCpfLegacy;
     }
 
     if (existingReservation) {

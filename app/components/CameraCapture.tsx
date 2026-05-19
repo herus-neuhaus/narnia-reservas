@@ -11,6 +11,7 @@ interface CameraCaptureProps {
 export default function CameraCapture({ onPhotoCaptured, initialPhoto = null }: CameraCaptureProps) {
   const [photo, setPhoto] = useState<string | null>(initialPhoto);
   const [isCameraActive, setIsCameraActive] = useState(false);
+  const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
   const [error, setError] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -32,12 +33,16 @@ export default function CameraCapture({ onPhotoCaptured, initialPhoto = null }: 
     }
   }, [isCameraActive]);
 
-  const startCamera = async () => {
+  const startCamera = async (mode: 'user' | 'environment' = facingMode) => {
     setError(null);
     try {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
+
       const constraints = {
         video: {
-          facingMode: 'user', // Selfie/Front camera for tablet check-in
+          facingMode: mode,
           width: { ideal: 640 },
           height: { ideal: 480 }
         },
@@ -46,6 +51,9 @@ export default function CameraCapture({ onPhotoCaptured, initialPhoto = null }: 
 
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
       setIsCameraActive(true);
     } catch (err: any) {
       console.error('Error accessing camera:', err);
@@ -62,6 +70,14 @@ export default function CameraCapture({ onPhotoCaptured, initialPhoto = null }: 
       videoRef.current.srcObject = null;
     }
     setIsCameraActive(false);
+  };
+
+  const toggleFacingMode = async () => {
+    const newMode = facingMode === 'user' ? 'environment' : 'user';
+    setFacingMode(newMode);
+    if (isCameraActive) {
+      await startCamera(newMode);
+    }
   };
 
   const capturePhoto = () => {
@@ -107,13 +123,23 @@ export default function CameraCapture({ onPhotoCaptured, initialPhoto = null }: 
             </button>
           </>
         ) : isCameraActive ? (
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            muted
-            className="w-full h-full object-cover scale-x-[-1]" // Mirror effect for user friendliness
-          />
+          <>
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className={`w-full h-full object-cover ${facingMode === 'user' ? 'scale-x-[-1]' : ''}`} // Mirror effect only for front camera
+            />
+            <button
+              type="button"
+              onClick={toggleFacingMode}
+              className="absolute bottom-2 right-2 p-2 bg-black/60 hover:bg-[#D4AF37] text-white hover:text-black rounded-xl transition-all shadow-lg z-10"
+              title={facingMode === 'user' ? 'Usar Câmera Traseira' : 'Usar Câmera Frontal'}
+            >
+              <RotateCw size={14} />
+            </button>
+          </>
         ) : (
           <div className="flex flex-col items-center text-white/20">
             <User size={48} strokeWidth={1} />
@@ -133,7 +159,7 @@ export default function CameraCapture({ onPhotoCaptured, initialPhoto = null }: 
         {!photo && !isCameraActive && (
           <button
             type="button"
-            onClick={startCamera}
+            onClick={() => startCamera()}
             className="px-4 py-2 bg-white/5 hover:bg-white/10 text-white border border-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5"
           >
             <Camera size={14} className="text-[#D4AF37]" />
@@ -163,7 +189,7 @@ export default function CameraCapture({ onPhotoCaptured, initialPhoto = null }: 
         {photo && !isCameraActive && (
           <button
             type="button"
-            onClick={startCamera}
+            onClick={() => startCamera()}
             className="px-4 py-2 bg-white/5 hover:bg-white/10 text-white border border-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5"
           >
             <RotateCw size={14} className="text-[#D4AF37]" />

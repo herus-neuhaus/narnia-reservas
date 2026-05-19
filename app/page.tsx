@@ -211,10 +211,20 @@ export default function NarniaClubPortal() {
   };
 
   const checkDailyListLimit = async (cpf: string, selectedDate: string) => {
+    // 1. Procura o id do cliente em customers
+    const { data: customerData } = await supabase
+      .from('customers')
+      .select('id')
+      .eq('cpf', cpf)
+      .maybeSingle();
+
+    if (!customerData) return false;
+
+    // 2. Verifica se já existe reserva com esse customer_id
     const { data } = await supabase
       .from('reservations')
       .select('id')
-      .eq('cpf', cpf)
+      .eq('customer_id', customerData.id)
       .eq('reservation_date', selectedDate)
       .not('status', 'ilike', 'cancelled');
 
@@ -304,9 +314,61 @@ export default function NarniaClubPortal() {
       }
     }
 
+    // 1. Upsert do cliente na tabela customers
+    let customerId: string | null = null;
+    try {
+      const { data: customer } = await supabase
+        .from('customers')
+        .select('id')
+        .eq('cpf', formData.cpf)
+        .maybeSingle();
+
+      if (customer) {
+        customerId = customer.id;
+        // Atualiza os dados do cliente existente caso alterados
+        await supabase
+          .from('customers')
+          .update({
+            name: formData.name,
+            email: formData.email || '',
+            whatsapp: formData.whatsapp,
+            birth_date: formData.birth_date
+          })
+          .eq('id', customerId);
+      } else {
+        // Insere novo cliente
+        const { data: newCustomer, error: customerErr } = await supabase
+          .from('customers')
+          .insert([{
+            cpf: formData.cpf,
+            name: formData.name,
+            email: formData.email || '',
+            whatsapp: formData.whatsapp,
+            birth_date: formData.birth_date
+          }])
+          .select('id')
+          .single();
+
+        if (customerErr) throw customerErr;
+        customerId = newCustomer.id;
+      }
+    } catch (e: any) {
+      console.error('Erro ao processar cliente:', e);
+      setCustomAlert({
+        title: 'Erro de Cadastro',
+        message: 'Não foi possível registrar os dados do cliente: ' + (e.message || e),
+        type: 'error'
+      });
+      setIsSubmitting(false);
+      return;
+    }
+
+    // 2. Inserção da reserva
     const { error } = await supabase
       .from('reservations')
       .insert([{
+        customer_id: customerId,
+        // Manter os campos legados para retrocompatibilidade antes do DROP:
         name: formData.name,
         email: formData.email || '',
         whatsapp: formData.whatsapp,
@@ -328,7 +390,7 @@ export default function NarniaClubPortal() {
       setIsSuccess(true);
     } else {
       console.error('Submit Error:', error);
-      const isDuplicate = error.code === '23505' || error.message?.includes('duplicate key') || error.message?.includes('unique_reservation_date_cpf');
+      const isDuplicate = error.code === '23505' || error.message?.includes('duplicate key') || error.message?.includes('unique_reservation_date_cpf') || error.message?.includes('unique_reservation_date_customer');
       setCustomAlert({
         title: isDuplicate ? 'Cadastro Duplicado' : 'Erro ao Processar',
         message: isDuplicate 

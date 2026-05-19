@@ -114,9 +114,56 @@ export default function QuickAddModal({
       return `${getValue('year')}-${getValue('month')}-${getValue('day')} ${getValue('hour')}:${getValue('minute')}:${getValue('second')}`;
     };
 
+    // 1. Upsert do cliente na tabela customers
+    let customerId: string | null = null;
+    try {
+      const { data: customer } = await supabase
+        .from('customers')
+        .select('id, photo')
+        .eq('cpf', quickFormData.cpf)
+        .maybeSingle();
+
+      if (customer) {
+        customerId = customer.id;
+        await supabase
+          .from('customers')
+          .update({
+            name: quickFormData.name,
+            whatsapp: quickFormData.whatsapp,
+            birth_date: quickFormData.birth_date,
+            photo: quickFormData.photo || customer.photo
+          })
+          .eq('id', customerId);
+      } else {
+        const { data: newCustomer, error: customerErr } = await supabase
+          .from('customers')
+          .insert([{
+            cpf: quickFormData.cpf,
+            name: quickFormData.name,
+            whatsapp: quickFormData.whatsapp,
+            birth_date: quickFormData.birth_date,
+            email: `portaria_${quickFormData.cpf.replace(/\D/g, '')}@narnia.com`,
+            photo: quickFormData.photo
+          }])
+          .select('id')
+          .single();
+
+        if (customerErr) throw customerErr;
+        customerId = newCustomer.id;
+      }
+    } catch (e: any) {
+      console.error('Error handling customer in QuickAddModal:', e);
+      alert('Erro ao cadastrar cliente: ' + (e.message || e));
+      setIsAdding(false);
+      return;
+    }
+
+    // 2. Inserção da reserva vinculada
     const { data, error } = await supabase
       .from('reservations')
       .insert([{
+        customer_id: customerId,
+        // Legacy fallback columns
         name: quickFormData.name,
         email: `portaria_${quickFormData.cpf.replace(/\D/g, '')}@narnia.com`,
         cpf: quickFormData.cpf,
@@ -139,7 +186,7 @@ export default function QuickAddModal({
       setQuickFormData({ name: '', cpf: '', birth_date: '', whatsapp: '', type: 'pulseira', location_id: '', photo: null });
       onClose();
     } else {
-      const isDuplicate = error?.code === '23505' || error?.message?.includes('duplicate key') || error?.message?.includes('unique_reservation_date_cpf');
+      const isDuplicate = error?.code === '23505' || error?.message?.includes('duplicate key') || error?.message?.includes('unique_reservation_date_cpf') || error?.message?.includes('unique_reservation_date_customer');
       if (isDuplicate) {
         onDuplicate({
           name: quickFormData.name,
@@ -159,18 +206,18 @@ export default function QuickAddModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm animate-in fade-in duration-300">
-      <div className="w-full max-w-lg bg-[#0A0A0A] rounded-[40px] border border-white/10 p-8 shadow-2xl animate-in zoom-in-95 duration-300">
-        <div className="flex justify-between items-center mb-8">
-          <h3 className="text-xl font-bold uppercase tracking-widest text-[#D4AF37]">Cadastro Rápido</h3>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/90 backdrop-blur-sm animate-in fade-in duration-300">
+      <div className="w-full max-w-md bg-[#0A0A0A] rounded-[32px] sm:rounded-[40px] border border-white/10 p-5 sm:p-8 shadow-2xl animate-in zoom-in-95 duration-300 max-h-[95vh] sm:max-h-[90vh] flex flex-col">
+        <div className="flex justify-between items-center mb-4 sm:mb-6 shrink-0">
+          <h3 className="text-lg sm:text-xl font-bold uppercase tracking-widest text-[#D4AF37]">Cadastro Rápido</h3>
           <button onClick={onClose} className="p-2 hover:bg-white/5 rounded-xl transition-all">
             <XCircle size={24} className="text-white/20" />
           </button>
         </div>
         
-        <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2 custom-scrollbar">
-          <div className="flex flex-col items-center justify-center pb-4 border-b border-white/5">
-            <label className="text-[10px] font-bold uppercase tracking-widest text-white/30 mb-2">Foto do Cliente (Opcional)</label>
+        <div className="space-y-3 sm:space-y-4 overflow-y-auto pr-1 sm:pr-2 custom-scrollbar grow flex-1">
+          <div className="flex flex-col items-center justify-center pb-3 border-b border-white/5">
+            <label className="text-[10px] font-bold uppercase tracking-widest text-white/30 mb-1.5">Foto do Cliente (Opcional)</label>
             <CameraCapture
               onPhotoCaptured={(photoBase64) => setQuickFormData(prev => ({ ...prev, photo: photoBase64 }))}
               initialPhoto={quickFormData.photo}
@@ -203,15 +250,15 @@ export default function QuickAddModal({
 
                   setIsCpfLoading(true);
                   supabase
-                    .rpc('get_reservations_by_cpf', { p_cpf: cpfValue })
+                    .from('customers')
+                    .select('*')
+                    .eq('cpf', cpfValue)
+                    .maybeSingle()
                     .then(({ data, error }) => {
-                      setIsCpfLoading(false);
-                      if (!error && data && data.length > 0) {
-                        const latest = data[0];
-                        
-                        // Validate age
-                        if (latest.birth_date) {
-                          const age = differenceInYears(new Date(), parseISO(latest.birth_date));
+                      if (!error && data) {
+                        setIsCpfLoading(false);
+                        if (data.birth_date) {
+                          const age = differenceInYears(new Date(), parseISO(data.birth_date));
                           if (age < 18) {
                             alert('Acesso Restrito: O Nárnia Club permite a entrada apenas para pessoas com 18 anos ou mais.');
                           }
@@ -219,20 +266,47 @@ export default function QuickAddModal({
 
                         setQuickFormData(prev => ({
                           ...prev,
-                          name: latest.name || prev.name,
-                          whatsapp: latest.whatsapp || prev.whatsapp,
-                          birth_date: latest.birth_date || prev.birth_date || '',
-                          photo: latest.photo || prev.photo
+                          name: data.name || prev.name,
+                          whatsapp: data.whatsapp || prev.whatsapp,
+                          birth_date: data.birth_date || prev.birth_date || '',
+                          photo: data.photo || prev.photo
                         }));
+                      } else {
+                        // Fallback to legacy reservations check if not in customers yet
+                        supabase
+                          .rpc('get_reservations_by_cpf', { p_cpf: cpfValue })
+                          .then(({ data: pastData, error: pastError }) => {
+                            setIsCpfLoading(false);
+                            if (!pastError && pastData && pastData.length > 0) {
+                              const latest = pastData[0];
+                              const reservationWithPhoto = pastData.find((r: any) => r.photo);
+                              const photoUrlOrBase64 = reservationWithPhoto ? reservationWithPhoto.photo : null;
+                              
+                              if (latest.birth_date) {
+                                const age = differenceInYears(new Date(), parseISO(latest.birth_date));
+                                if (age < 18) {
+                                  alert('Acesso Restrito: O Nárnia Club permite a entrada apenas para pessoas com 18 anos ou mais.');
+                                }
+                              }
+
+                              setQuickFormData(prev => ({
+                                ...prev,
+                                name: latest.name || prev.name,
+                                whatsapp: latest.whatsapp || prev.whatsapp,
+                                birth_date: latest.birth_date || prev.birth_date || '',
+                                photo: photoUrlOrBase64 || prev.photo
+                              }));
+                            }
+                          });
                       }
                     });
                 }
               }}
               placeholder="000.000.000-00"
-              className="w-full px-6 py-4 bg-black border border-white/10 rounded-2xl focus:border-[#D4AF37] outline-none text-white font-bold"
+              className="w-full px-5 py-3 sm:px-6 sm:py-4 bg-black border border-white/10 rounded-2xl focus:border-[#D4AF37] outline-none text-white font-bold"
             />
             {isCpfLoading && (
-              <div className="absolute right-4 bottom-4 flex items-center gap-2 text-xs text-[#D4AF37]">
+              <div className="absolute right-4 bottom-3 sm:bottom-4 flex items-center gap-2 text-xs text-[#D4AF37]">
                 <Loader2 className="w-4 h-4 animate-spin" />
                 <span>Verificando...</span>
               </div>
@@ -245,7 +319,7 @@ export default function QuickAddModal({
               value={isCpfLoading ? "" : quickFormData.name}
               disabled={isCpfLoading}
               onChange={(e) => setQuickFormData({...quickFormData, name: e.target.value})}
-              className={`w-full px-6 py-4 bg-black border border-white/10 rounded-2xl focus:border-[#D4AF37] outline-none text-white font-medium ${isCpfLoading ? 'opacity-50 animate-pulse border-[#D4AF37]/50 pointer-events-none' : ''}`}
+              className={`w-full px-5 py-3 sm:px-6 sm:py-4 bg-black border border-white/10 rounded-2xl focus:border-[#D4AF37] outline-none text-white font-medium ${isCpfLoading ? 'opacity-50 animate-pulse border-[#D4AF37]/50 pointer-events-none' : ''}`}
               placeholder={isCpfLoading ? "Verificando CPF..." : "Nome Completo"}
             />
           </div>
@@ -256,7 +330,7 @@ export default function QuickAddModal({
               value={isCpfLoading ? "" : quickFormData.birth_date}
               disabled={isCpfLoading}
               onChange={(e) => setQuickFormData({...quickFormData, birth_date: e.target.value})}
-              className={`w-full px-6 py-4 bg-black border border-white/10 rounded-2xl focus:border-[#D4AF37] outline-none text-white font-medium ${isCpfLoading ? 'opacity-50 animate-pulse border-[#D4AF37]/50 pointer-events-none' : ''}`}
+              className={`w-full px-5 py-3 sm:px-6 sm:py-4 bg-black border border-white/10 rounded-2xl focus:border-[#D4AF37] outline-none text-white font-medium ${isCpfLoading ? 'opacity-50 animate-pulse border-[#D4AF37]/50 pointer-events-none' : ''}`}
             />
           </div>
           <div className="relative">
@@ -266,7 +340,7 @@ export default function QuickAddModal({
               value={isCpfLoading ? "" : quickFormData.whatsapp}
               disabled={isCpfLoading}
               onChange={(e) => setQuickFormData({...quickFormData, whatsapp: formatPhone(e.target.value)})}
-              className={`w-full px-6 py-4 bg-black border border-white/10 rounded-2xl focus:border-[#D4AF37] outline-none text-white font-medium ${isCpfLoading ? 'opacity-50 animate-pulse border-[#D4AF37]/50 pointer-events-none' : ''}`}
+              className={`w-full px-5 py-3 sm:px-6 sm:py-4 bg-black border border-white/10 rounded-2xl focus:border-[#D4AF37] outline-none text-white font-medium ${isCpfLoading ? 'opacity-50 animate-pulse border-[#D4AF37]/50 pointer-events-none' : ''}`}
               placeholder={isCpfLoading ? "Aguarde..." : "(69) 99999-9999"}
             />
           </div>
@@ -282,7 +356,7 @@ export default function QuickAddModal({
                   key={t.id}
                   type="button"
                   onClick={() => setQuickFormData({ ...quickFormData, type: t.id as any, location_id: '' })}
-                  className={`py-4 rounded-xl text-xs font-bold uppercase border transition-all ${quickFormData.type === t.id ? 'bg-[#D4AF37] border-[#D4AF37] text-black shadow-lg shadow-[#D4AF37]/10' : 'bg-black border-white/10 text-white/40 hover:text-white/60'}`}
+                  className={`py-3 sm:py-4 rounded-xl text-xs font-bold uppercase border transition-all ${quickFormData.type === t.id ? 'bg-[#D4AF37] border-[#D4AF37] text-black shadow-lg shadow-[#D4AF37]/10' : 'bg-black border-white/10 text-white/40 hover:text-white/60'}`}
                 >
                   {t.label}
                 </button>
@@ -325,7 +399,7 @@ export default function QuickAddModal({
             type="button"
             onClick={handleQuickAdd}
             disabled={isAdding}
-            className="w-full py-5 bg-[#D4AF37] text-black rounded-3xl font-black uppercase tracking-widest mt-4 shadow-xl hover:bg-[#b8962f] transition-all flex items-center justify-center gap-2"
+            className="w-full py-4 sm:py-5 bg-[#D4AF37] text-black rounded-3xl font-black uppercase tracking-widest mt-2 sm:mt-4 shadow-xl hover:bg-[#b8962f] transition-all flex items-center justify-center gap-2 shrink-0"
           >
             {isAdding ? <Loader2 className="animate-spin" /> : 'CONCLUIR E ENTRAR'}
           </button>

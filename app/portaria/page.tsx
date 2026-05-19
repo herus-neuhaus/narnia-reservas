@@ -29,7 +29,7 @@ import { ptBR } from 'date-fns/locale';
 import QuickAddModal from '@/app/components/QuickAddModal';
 import CameraCapture from '@/app/components/CameraCapture';
 
-type Reservation = Database['public']['Tables']['reservations']['Row'];
+type Reservation = Database['public']['Tables']['reservations']['Row'] & { customers?: any };
 type Blacklist = Database['public']['Tables']['blacklist']['Row'];
 
 export default function PortariaDashboard() {
@@ -88,15 +88,27 @@ export default function PortariaDashboard() {
 
     const { data: resData } = await supabase
       .from('reservations')
-      .select('*')
-      .eq('reservation_date', today)
-      .order('name');
+      .select('*, customers(*)')
+      .eq('reservation_date', today);
+
+    // Map properties to base object for perfect backward compatibility
+    const mappedResData = (resData || []).map((res: any) => ({
+      ...res,
+      name: res.customers?.name || res.name,
+      cpf: res.customers?.cpf || res.cpf,
+      whatsapp: res.customers?.whatsapp || res.whatsapp,
+      photo: res.customers?.photo || res.photo
+    })).sort((a: any, b: any) => {
+      const nameA = a.name || '';
+      const nameB = b.name || '';
+      return nameA.localeCompare(nameB);
+    });
 
     const { data: blData } = await supabase
       .from('blacklist')
       .select('*');
 
-    setReservations(resData || []);
+    setReservations(mappedResData);
     setBlacklist(blData || []);
     setLoading(false);
   };
@@ -121,9 +133,9 @@ export default function PortariaDashboard() {
     }
 
     const found = reservations.find(r => 
-      r.cpf === term || 
-      r.whatsapp?.includes(term) || 
-      r.name.toLowerCase().includes(term.toLowerCase())
+      (r.customers?.cpf || r.cpf) === term || 
+      (r.customers?.whatsapp || r.whatsapp)?.includes(term) || 
+      (r.customers?.name || r.name).toLowerCase().includes(term.toLowerCase())
     );
     setSearchResult(found || null);
   };
@@ -179,6 +191,13 @@ export default function PortariaDashboard() {
 
     if (photoBase64) {
       updateData.photo = photoBase64;
+      const res = reservations.find(r => r.id === id);
+      if (res?.customer_id) {
+        await supabase
+          .from('customers')
+          .update({ photo: photoBase64 })
+          .eq('id', res.customer_id);
+      }
     }
     
     const { error } = await supabase
@@ -187,16 +206,81 @@ export default function PortariaDashboard() {
       .eq('id', id);
 
     if (!error) {
-      setReservations(reservations.map(r => r.id === id ? { ...r, ...updateData } : r));
+      setReservations(reservations.map(r => {
+        if (r.id === id) {
+          const updated = { ...r, ...updateData };
+          if (photoBase64) {
+            updated.photo = photoBase64;
+            if (updated.customers) {
+              updated.customers.photo = photoBase64;
+            }
+          }
+          return updated;
+        }
+        return r;
+      }));
       if (searchResult?.id === id) {
-        setSearchResult({ ...searchResult, ...updateData });
+        const updatedResult = { ...searchResult, ...updateData };
+        if (photoBase64) {
+          updatedResult.photo = photoBase64;
+          if (updatedResult.customers) {
+            updatedResult.customers.photo = photoBase64;
+          }
+        }
+        setSearchResult(updatedResult);
       }
     }
   };
 
-  const handleCheckInClick = (id: string, currentStatus: string | null) => {
+  const handleCheckInClick = async (id: string, currentStatus: string | null) => {
     const res = reservations.find(r => r.id === id);
-    if (currentStatus !== 'entered' && res && !res.photo) {
+    if (!res) return;
+
+    const hasPhoto = res.customers?.photo || res.photo;
+
+    if (currentStatus !== 'entered' && !hasPhoto) {
+      if (res.customer_id) {
+        setLoading(true);
+        try {
+          const { data: customer } = await supabase
+            .from('customers')
+            .select('photo')
+            .eq('id', res.customer_id)
+            .maybeSingle();
+
+          if (customer?.photo) {
+            await toggleCheckInWithPhoto(id, currentStatus, customer.photo);
+            setLoading(false);
+            return;
+          }
+        } catch (err) {
+          console.error('Error fetching customer photo:', err);
+        } finally {
+          setLoading(false);
+        }
+      }
+
+      if (res.cpf) {
+        setLoading(true);
+        try {
+          const { data: pastData, error } = await supabase
+            .rpc('get_reservations_by_cpf', { p_cpf: res.cpf });
+          
+          if (!error && pastData && pastData.length > 0) {
+            const pastResWithPhoto = pastData.find((r: any) => r.photo);
+            if (pastResWithPhoto && pastResWithPhoto.photo) {
+              await toggleCheckInWithPhoto(id, currentStatus, pastResWithPhoto.photo);
+              setLoading(false);
+              return;
+            }
+          }
+        } catch (err) {
+          console.error('Error fetching past photo:', err);
+        } finally {
+          setLoading(false);
+        }
+      }
+
       // Trigger a direct warning alert to the receptionist
       alert('⚠️ AVISO IMPORTANTE: Este cliente não possui foto cadastrada!\nPor favor, capture a foto do cliente no tablet/computador antes de dar a entrada.');
       setCapturedPhoto(null);
@@ -207,7 +291,22 @@ export default function PortariaDashboard() {
   };
 
   const onQuickAddSuccess = (newRes: Reservation) => {
-    setReservations(prev => [newRes, ...prev]);
+    const mappedRes = {
+      ...newRes,
+      name: newRes.name,
+      cpf: newRes.cpf,
+      whatsapp: newRes.whatsapp,
+      photo: newRes.photo,
+      customers: {
+        id: newRes.customer_id || '',
+        cpf: newRes.cpf,
+        name: newRes.name || '',
+        whatsapp: newRes.whatsapp || '',
+        birth_date: newRes.birth_date,
+        photo: newRes.photo
+      }
+    };
+    setReservations(prev => [mappedRes, ...prev]);
   };
 
   const handleLogout = async () => {

@@ -37,7 +37,7 @@ import ClientsManager from './ClientsManager';
 import AdminLayoutShell from './AdminLayoutShell';
 import TeamManager from './TeamManager';
 
-type Reservation = Database['public']['Tables']['reservations']['Row'];
+type Reservation = Database['public']['Tables']['reservations']['Row'] & { customers?: any };
 type Blacklist = Database['public']['Tables']['blacklist']['Row'];
 type ReservationStatus = 'pending' | 'confirmed' | 'cancelled' | 'completed';
 
@@ -73,14 +73,21 @@ function AdminDashboardContent() {
     setLoading(true);
     const { data, error } = await supabase
       .from('reservations')
-      .select('*')
+      .select('*, customers(*)')
       .gte('reservation_date', startDate)
       .lte('reservation_date', endDate)
       .order('reservation_date', { ascending: true })
       .order('reservation_time', { ascending: true });
 
     if (!error) {
-      setReservations(data || []);
+      const mapped = (data || []).map((res: any) => ({
+        ...res,
+        name: res.customers?.name || res.name,
+        cpf: res.customers?.cpf || res.cpf,
+        whatsapp: res.customers?.whatsapp || res.whatsapp,
+        photo: res.customers?.photo || res.photo
+      }));
+      setReservations(mapped);
     }
     setLoading(false);
   }, [supabase, startDate, endDate]);
@@ -142,9 +149,9 @@ function AdminDashboardContent() {
   };
 
   const filteredReservations = reservations.filter(res => 
-    res.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    res.whatsapp.includes(searchTerm) ||
-    res.cpf?.includes(searchTerm)
+    (res.customers?.name || res.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
+    (res.customers?.whatsapp || res.whatsapp || '').includes(searchTerm) ||
+    (res.customers?.cpf || res.cpf || '')?.includes(searchTerm)
   );
 
   return (

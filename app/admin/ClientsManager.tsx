@@ -29,6 +29,7 @@ interface ClientRecord {
   reservations: any[];
   isBlacklisted: boolean;
   blacklistInfo: any | null;
+  photo?: string | null;
 }
 
 export default function ClientsManager() {
@@ -45,14 +46,13 @@ export default function ClientsManager() {
     const fetchClientsData = async () => {
       setLoading(true);
       try {
-        // Fetch all reservations
-        const { data: resData, error: resError } = await supabase
-          .from('reservations')
-          .select('*')
-          .order('reservation_date', { ascending: false })
-          .order('reservation_time', { ascending: false });
+        // Fetch all customers with their reservations
+        const { data: custData, error: custError } = await supabase
+          .from('customers')
+          .select('*, reservations(*)')
+          .order('name');
 
-        if (resError) throw resError;
+        if (custError) throw custError;
 
         // Fetch blacklist
         const { data: blackData, error: blackError } = await supabase
@@ -71,43 +71,29 @@ export default function ClientsManager() {
           });
         }
 
-        // Group reservations by CPF
-        const clientGroups = new Map<string, any[]>();
-        if (resData) {
-          resData.forEach(r => {
-            if (r.cpf) {
-              const cleanCpf = r.cpf.replace(/\D/g, '');
-              if (cleanCpf.length === 11) { // Standard CPF length
-                if (!clientGroups.has(cleanCpf)) {
-                  clientGroups.set(cleanCpf, []);
-                }
-                clientGroups.get(cleanCpf)!.push(r);
-              }
-            }
-          });
-        }
-
-        // Construct client records
-        const clientRecords: ClientRecord[] = [];
-        clientGroups.forEach((resList, cleanCpf) => {
-          // Latest reservation provides default info
-          const latestRes = resList[0];
-          
-          // Re-format CPF nicely
-          const formattedCpf = latestRes.cpf || cleanCpf;
-          
+        // Construct client records from customers
+        const clientRecords: ClientRecord[] = (custData || []).map(c => {
+          const cleanCpf = c.cpf ? c.cpf.replace(/\D/g, '') : '';
           const isBlacklisted = blacklistMap.has(cleanCpf);
           const blacklistInfo = blacklistMap.get(cleanCpf) || null;
 
-          clientRecords.push({
-            cpf: formattedCpf,
-            name: latestRes.name,
-            whatsapp: latestRes.whatsapp,
-            birth_date: latestRes.birth_date || null,
-            reservations: resList,
-            isBlacklisted,
-            blacklistInfo
+          // Sort reservations newest first
+          const sortedReservations = (c.reservations || []).sort((a: any, b: any) => {
+            const dateA = `${a.reservation_date} ${a.reservation_time || '00:00'}`;
+            const dateB = `${b.reservation_date} ${b.reservation_time || '00:00'}`;
+            return dateB.localeCompare(dateA);
           });
+
+          return {
+            cpf: c.cpf || '',
+            name: c.name,
+            whatsapp: c.whatsapp,
+            birth_date: c.birth_date || null,
+            reservations: sortedReservations,
+            isBlacklisted,
+            blacklistInfo,
+            photo: c.photo || null
+          };
         });
 
         setClients(clientRecords);
@@ -285,12 +271,14 @@ export default function ClientsManager() {
                 >
                   <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6 w-full lg:w-auto">
                     {/* Avatar Badge */}
-                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center border shrink-0 transition-transform ${
+                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center border shrink-0 transition-transform overflow-hidden ${
                       client.isBlacklisted ? 'bg-red-500/10 border-red-500/30 text-red-500' :
                       stats.entered >= 2 ? 'bg-[#D4AF37]/10 border-[#D4AF37]/20 text-[#D4AF37]' :
                       'bg-white/5 border-white/10 text-white/30'
                     }`}>
-                      {client.isBlacklisted ? (
+                      {client.photo ? (
+                        <img src={client.photo} alt={client.name} className="w-full h-full object-cover" />
+                      ) : client.isBlacklisted ? (
                         <ShieldAlert size={28} />
                       ) : stats.entered >= 2 ? (
                         <Award size={28} className="animate-pulse" />
@@ -365,7 +353,14 @@ export default function ClientsManager() {
                       
                       {/* Left: General Client Information Card */}
                       <div className="bg-black/60 p-6 rounded-2xl border border-white/5 space-y-4">
-                        <h4 className="text-[10px] font-black uppercase tracking-widest text-[#D4AF37] border-b border-white/5 pb-2">Informações Cadastrais</h4>
+                        <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                          <h4 className="text-[10px] font-black uppercase tracking-widest text-[#D4AF37]">Informações Cadastrais</h4>
+                          {client.photo && (
+                            <div className="w-10 h-10 rounded-lg overflow-hidden border border-white/10 shrink-0">
+                              <img src={client.photo} alt={client.name} className="w-full h-full object-cover" />
+                            </div>
+                          )}
+                        </div>
                         <div className="space-y-3 text-xs">
                           <div>
                             <span className="text-white/30 block mb-0.5">Nome Completo</span>

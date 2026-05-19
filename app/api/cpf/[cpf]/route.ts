@@ -40,7 +40,8 @@ export async function GET(
               birthDate: birthDateFormatted,
               day: parseInt(dayStr, 10),
               month: parseInt(monthStr, 10),
-              year: parseInt(yearStr, 10)
+              year: parseInt(yearStr, 10),
+              photo: latest.photo
             }
           });
         }
