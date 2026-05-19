@@ -258,8 +258,8 @@ function AdminDashboardContent() {
               <StatCard icon={ClipboardList} label="Nome na Lista" value={reservations.filter(r => r.type === 'lista').length} color="#D4AF37" />
             </div>
 
-            {/* Table */}
-            <div className="bg-[#0A0A0A] rounded-[32px] border border-white/5 shadow-2xl overflow-x-auto custom-scrollbar">
+            {/* Desktop Table View */}
+            <div className="hidden md:block bg-[#0A0A0A] rounded-[32px] border border-white/5 shadow-2xl overflow-x-auto custom-scrollbar">
               <table className="w-full min-w-[800px] text-left border-collapse">
                 <thead>
                   <tr className="bg-white/5 border-b border-white/5">
@@ -301,7 +301,7 @@ function AdminDashboardContent() {
                               setSelectedReservation(res);
                               setIsWhatsAppModalOpen(true);
                             }}
-                            className="p-2 bg-white/5 rounded-xl hover:bg-[#D4AF37] hover:text-black transition-all"
+                            className="p-2 bg-white/5 rounded-xl hover:bg-[#D4AF37] hover:text-black transition-all animate-none"
                             title="Enviar WhatsApp"
                           >
                             <MessageCircle size={16} />
@@ -326,6 +326,70 @@ function AdminDashboardContent() {
                   ))}
                 </tbody>
               </table>
+            </div>
+
+            {/* Mobile Cards View */}
+            <div className="block md:hidden space-y-4">
+              {filteredReservations.map((res) => (
+                <div 
+                  key={res.id} 
+                  className={`bg-[#0A0A0A] border rounded-[24px] p-5 space-y-4 transition-all ${
+                    res.status === 'cancelled' ? 'border-red-500/10 opacity-70' :
+                    res.status === 'confirmed' ? 'border-green-500/20' : 'border-white/5'
+                  }`}
+                >
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h4 className="font-bold text-sm text-white">{res.name}</h4>
+                      <p className="text-[10px] text-white/40 font-medium mt-1">{res.whatsapp}</p>
+                      <p className="text-[10px] text-white/40 font-medium">{res.cpf || 'Sem CPF'}</p>
+                    </div>
+                    <StatusBadge status={res.status} />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 border-y border-white/5 py-3 text-xs">
+                    <div>
+                      <p className="text-[9px] font-bold text-white/20 uppercase tracking-widest">Tipo</p>
+                      <div className="flex items-center gap-1.5 mt-1">
+                        {res.type === 'mesa' ? <LayoutGrid size={12} className="text-[#D4AF37]" /> : res.type === 'camarote' ? <Gem size={12} className="text-purple-500" /> : <ClipboardList size={12} className="text-blue-500" />}
+                        <span className="font-bold uppercase tracking-tighter text-white/80">{res.type} {res.location_id}</span>
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-[9px] font-bold text-white/20 uppercase tracking-widest">Data / Hora</p>
+                      <p className="font-bold text-white mt-1">
+                        {format(parseISO(res.reservation_date), 'dd/MM/yyyy')} <span className="text-[#D4AF37] ml-1">{res.reservation_time}</span>
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2 pt-1">
+                    <button 
+                      onClick={() => {
+                        setSelectedReservation(res);
+                        setIsWhatsAppModalOpen(true);
+                      }}
+                      className="flex-1 py-3 bg-white/5 hover:bg-[#D4AF37] hover:text-black rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-1.5 transition-all text-white/80"
+                    >
+                      <MessageCircle size={14} /> WhatsApp
+                    </button>
+                    <button 
+                      onClick={() => updateStatus(res.id, 'confirmed')}
+                      className="p-3 bg-green-500/10 text-green-500 border border-green-500/20 hover:bg-green-500 hover:text-white rounded-xl transition-all"
+                      title="Confirmar"
+                    >
+                      <CheckCircle size={14} />
+                    </button>
+                    <button 
+                      onClick={() => updateStatus(res.id, 'cancelled')}
+                      className="p-3 bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500 hover:text-white rounded-xl transition-all"
+                      title="Cancelar"
+                    >
+                      <XCircle size={14} />
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         ) : currentView === 'clientes' ? (

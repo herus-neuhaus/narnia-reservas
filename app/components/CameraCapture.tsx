@@ -26,6 +26,12 @@ export default function CameraCapture({ onPhotoCaptured, initialPhoto = null }: 
     };
   }, []);
 
+  useEffect(() => {
+    if (isCameraActive && videoRef.current && streamRef.current) {
+      videoRef.current.srcObject = streamRef.current;
+    }
+  }, [isCameraActive]);
+
   const startCamera = async () => {
     setError(null);
     try {
@@ -40,9 +46,6 @@ export default function CameraCapture({ onPhotoCaptured, initialPhoto = null }: 
 
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-      }
       setIsCameraActive(true);
     } catch (err: any) {
       console.error('Error accessing camera:', err);

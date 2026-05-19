@@ -210,17 +210,12 @@ export default function NarniaClubPortal() {
     return Object.keys(errors).length === 0;
   };
 
-  const checkWeeklyListLimit = async (cpf: string) => {
-    const start = format(startOfWeek(new Date()), 'yyyy-MM-dd');
-    const end = format(endOfWeek(new Date()), 'yyyy-MM-dd');
-
+  const checkDailyListLimit = async (cpf: string, selectedDate: string) => {
     const { data } = await supabase
       .from('reservations')
       .select('id')
       .eq('cpf', cpf)
-      .eq('type', 'lista')
-      .gte('reservation_date', start)
-      .lte('reservation_date', end)
+      .eq('reservation_date', selectedDate)
       .not('status', 'ilike', 'cancelled');
 
     return (data || []).length > 0;
@@ -260,8 +255,17 @@ export default function NarniaClubPortal() {
 
     if (portalMode === 'lista') {
       try {
-        const res = await fetch(`/api/events/validate?date=${date}`);
+        const res = await fetch(`/api/events/validate?date=${date}&cpf=${encodeURIComponent(formData.cpf)}`);
         const resData = await res.json();
+        if (res.status === 400 && resData.error === 'CPF_DUPLICATE') {
+          setCustomAlert({
+            title: 'CPF Já Cadastrado',
+            message: resData.message || 'Este CPF já foi adicionado à lista para este evento neste dia.',
+            type: 'warning'
+          });
+          setIsSubmitting(false);
+          return;
+        }
         if (resData && resData.allowed === false) {
           setCustomAlert({
             title: 'Lista Encerrada',
@@ -275,7 +279,7 @@ export default function NarniaClubPortal() {
         console.error('Erro ao validar lista:', err);
       }
 
-      const alreadyOnList = await checkWeeklyListLimit(formData.cpf);
+      const alreadyOnList = await checkDailyListLimit(formData.cpf, date);
       if (alreadyOnList) {
         setCustomAlert({
           title: 'CPF Já Cadastrado',
@@ -470,10 +474,24 @@ export default function NarniaClubPortal() {
               events={events}
               loading={loadingEvents}
               onDateSelect={async (d) => {
+                // Limpa os estados de erro e alertas ao alterar a data no seletor
+                setFormErrors({});
+                setCustomAlert(null);
+                setBlacklistAlert(null);
+
                 if (portalMode === 'lista') {
                   try {
-                    const res = await fetch(`/api/events/validate?date=${d}`);
+                    const cpfParam = formData.cpf ? `&cpf=${encodeURIComponent(formData.cpf)}` : '';
+                    const res = await fetch(`/api/events/validate?date=${d}${cpfParam}`);
                     const resData = await res.json();
+                    if (res.status === 400 && resData.error === 'CPF_DUPLICATE') {
+                      setCustomAlert({
+                        title: 'CPF Já Cadastrado',
+                        message: resData.message || 'Este CPF já foi adicionado à lista para este evento neste dia.',
+                        type: 'warning'
+                      });
+                      return;
+                    }
                     if (resData && resData.allowed === false) {
                       setCustomAlert({
                         title: 'Lista Encerrada',
