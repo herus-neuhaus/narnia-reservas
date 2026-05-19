@@ -29,21 +29,21 @@ export default function LoginPage() {
       if (authError) {
         setError(authError.message);
       } else if (data?.session) {
-        // Query the profile role dynamically
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', data.session.user.id)
-          .single();
-
-        if (profileError) {
-          console.error('Error fetching user profile during login:', profileError);
+        // Fetch role from internal API to avoid RLS 406 errors
+        let role = 'customer';
+        try {
+          const response = await fetch(`/api/team/list?email=${encodeURIComponent(data.session.user.email || '')}`);
+          const result = await response.json();
+          if (result.success && result.data && result.data.length > 0) {
+            role = result.data[0].role;
+          }
+        } catch (err) {
+          console.error('Error fetching role:', err);
         }
 
-        const role = profile?.role || 'customer';
         const isAuthAdmin = ['dono', 'gerente', 'admin'].includes(role) || data.session.user.email === 'narnia@admin.com';
         
-        if (role === 'portaria') {
+        if (role === 'portaria' || role === 'receptionist') {
           router.push('/portaria');
         } else if (isAuthAdmin) {
           router.push('/admin');
@@ -118,6 +118,16 @@ export default function LoginPage() {
             Entrar no Painel
           </button>
         </form>
+
+        <div className="text-center mt-6">
+          <button
+            type="button"
+            onClick={() => router.push('/ativar')}
+            className="text-xs text-[#D4AF37]/80 hover:text-[#D4AF37] hover:underline bg-transparent border-none cursor-pointer uppercase tracking-widest font-bold transition-colors"
+          >
+            Seu primeiro acesso? Clique aqui
+          </button>
+        </div>
 
         <p className="text-center text-[9px] mt-8 opacity-40 uppercase tracking-widest text-white/40">
           Sistema de Gestão Interna • Nárnia

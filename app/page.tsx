@@ -78,6 +78,11 @@ export default function NarniaClubPortal() {
   
   const supabase = createClient();
   const WHATSAPP_NUMBER = "5569999798553";
+
+  const selectedEvent = events.find(e => e.event_date === date);
+  const listLimitTime = selectedEvent?.list_limit_time 
+    ? selectedEvent.list_limit_time.substring(0, 5) 
+    : '23:30';
  
   const handleSearch = async () => {
     const formattedCpf = formatCPF(searchCpf);
@@ -254,6 +259,22 @@ export default function NarniaClubPortal() {
     }
 
     if (portalMode === 'lista') {
+      try {
+        const res = await fetch(`/api/events/validate?date=${date}`);
+        const resData = await res.json();
+        if (resData && resData.allowed === false) {
+          setCustomAlert({
+            title: 'Lista Encerrada',
+            message: resData.reason || 'Infelizmente o limite de nomes para a lista deste evento já foi atingido.',
+            type: 'warning'
+          });
+          setIsSubmitting(false);
+          return;
+        }
+      } catch (err) {
+        console.error('Erro ao validar lista:', err);
+      }
+
       const alreadyOnList = await checkWeeklyListLimit(formData.cpf);
       if (alreadyOnList) {
         setCustomAlert({
@@ -303,9 +324,12 @@ export default function NarniaClubPortal() {
       setIsSuccess(true);
     } else {
       console.error('Submit Error:', error);
+      const isDuplicate = error.code === '23505' || error.message?.includes('duplicate key') || error.message?.includes('unique_reservation_date_cpf');
       setCustomAlert({
-        title: 'Erro ao Processar',
-        message: 'Ocorreu um erro ao processar sua solicitação: ' + error.message,
+        title: isDuplicate ? 'Cadastro Duplicado' : 'Erro ao Processar',
+        message: isDuplicate 
+          ? 'Este CPF já possui uma reserva ou entrada confirmada para este mesmo dia!' 
+          : 'Ocorreu um erro ao processar sua solicitação: ' + error.message,
         type: 'error'
       });
     }
@@ -445,7 +469,26 @@ export default function NarniaClubPortal() {
               selectedDate={date} 
               events={events}
               loading={loadingEvents}
-              onDateSelect={(d) => { setDate(d); setActiveStep(portalMode === 'lista' ? 5 : 2); }} 
+              onDateSelect={async (d) => {
+                if (portalMode === 'lista') {
+                  try {
+                    const res = await fetch(`/api/events/validate?date=${d}`);
+                    const resData = await res.json();
+                    if (resData && resData.allowed === false) {
+                      setCustomAlert({
+                        title: 'Lista Encerrada',
+                        message: resData.reason || 'Infelizmente o limite de nomes para a lista deste evento já foi atingido.',
+                        type: 'warning'
+                      });
+                      return;
+                    }
+                  } catch (err) {
+                    console.error('Erro ao validar lista:', err);
+                  }
+                }
+                setDate(d); 
+                setActiveStep(portalMode === 'lista' ? 5 : 2); 
+              }} 
             />
           </div>
         )}
@@ -502,16 +545,31 @@ export default function NarniaClubPortal() {
                   const cpf = formatCPF(e.target.value);
                   setFormData({...formData, cpf});
                   
-                  // Auto-fill if CPF is found in previous reservations, otherwise fall back to CPFHub.io
+                  // Auto-fill if CPF is found in previous reservations
                   const cleanCpf = cpf.replace(/\D/g, '');
                   if (cleanCpf.length === 11) {
+                    if (!cpfValidator.isValid(cleanCpf)) {
+                      setFormErrors(prev => ({
+                        ...prev,
+                        cpf: 'CPF inválido'
+                      }));
+                      return;
+                    }
+
+                    // Clear CPF error if valid
+                    setFormErrors(prev => {
+                      const newErr = { ...prev };
+                      delete newErr.cpf;
+                      return newErr;
+                    });
+
                     setIsCpfLoading(true);
                     supabase
                       .rpc('get_reservations_by_cpf', { p_cpf: cpf })
                       .then(({ data, error }) => {
+                        setIsCpfLoading(false);
                         if (!error && data && data.length > 0) {
                           const latest = data[0];
-                          setIsCpfLoading(false);
                           
                           // Validate age
                           if (latest.birth_date) {
@@ -542,56 +600,6 @@ export default function NarniaClubPortal() {
                             whatsapp: latest.whatsapp || prev.whatsapp,
                             birth_date: latest.birth_date || prev.birth_date
                           }));
-                        } else {
-                          // Fall back to CPFHub.io lookup API
-                          fetch(`/api/cpf/${cleanCpf}`)
-                            .then(res => res.json())
-                            .then(resData => {
-                              setIsCpfLoading(false);
-                              if (resData.success && resData.data) {
-                                const info = resData.data;
-                                let birthDateFormatted = '';
-                                if (info.birthDate) {
-                                  const parts = info.birthDate.split('/');
-                                  if (parts.length === 3) {
-                                    birthDateFormatted = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
-                                  }
-                                }
-
-                                // Validate age
-                                if (birthDateFormatted) {
-                                  const age = differenceInYears(new Date(), parseISO(birthDateFormatted));
-                                  if (age < 18) {
-                                    setFormErrors(prev => ({
-                                      ...prev,
-                                      cpf: 'Apenas maiores de 18 anos podem reservar'
-                                    }));
-                                    setCustomAlert({
-                                      title: 'Acesso Restrito',
-                                      message: 'O Nárnia Club permite a entrada apenas para pessoas com 18 anos ou mais.',
-                                      type: 'error'
-                                    });
-                                  } else {
-                                    setFormErrors(prev => {
-                                      const newErr = { ...prev };
-                                      delete newErr.cpf;
-                                      delete newErr.birth_date;
-                                      return newErr;
-                                    });
-                                  }
-                                }
-
-                                setFormData(prev => ({
-                                  ...prev,
-                                  // Do not complete the name anymore as requested by the user
-                                  birth_date: birthDateFormatted || prev.birth_date
-                                }));
-                              }
-                            })
-                            .catch(err => {
-                              console.error('Error fetching from CPFHub:', err);
-                              setIsCpfLoading(false);
-                            });
                         }
                       });
                   }
@@ -798,9 +806,9 @@ export default function NarniaClubPortal() {
               <div className="space-y-4">
                 <p className="text-white font-black uppercase tracking-wider text-sm">Seu nome já está na lista!</p>
                 <p className="text-white/60 font-medium text-xs leading-relaxed">
-                  Lembre-se: o seu acesso com desconto ou benefício é garantido **até as 23:30**. 
+                  Lembre-se: o seu acesso com desconto ou benefício é garantido **até as {listLimitTime}**. 
                   <br />
-                  <span className="text-[#D4AF37] font-black block mt-3 uppercase tracking-wider">Após as 23:30, será cobrado o valor normal de bilheteria.</span>
+                  <span className="text-[#D4AF37] font-black block mt-3 uppercase tracking-wider">Após as {listLimitTime}, será cobrado o valor normal de bilheteria.</span>
                 </p>
               </div>
             ) : (

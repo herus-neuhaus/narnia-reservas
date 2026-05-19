@@ -156,6 +156,28 @@ export default function ClientsManager() {
     return 0;
   });
 
+  const formatToBrlDateTime = (dateStr: string | null) => {
+    if (!dateStr) return '';
+    try {
+      const cleanStr = dateStr.replace('T', ' ');
+      const parts = cleanStr.split(' ');
+      if (parts.length >= 2) {
+        const dateParts = parts[0].split('-');
+        const timeParts = parts[1].split(':');
+        if (dateParts.length === 3 && timeParts.length >= 2) {
+          return `${dateParts[2]}/${dateParts[1]}/${dateParts[0]} ${timeParts[0]}:${timeParts[1]}`;
+        }
+      }
+      const dateParts = dateStr.split('-');
+      if (dateParts.length === 3) {
+        return `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}`;
+      }
+      return dateStr;
+    } catch {
+      return dateStr;
+    }
+  };
+
   const getAge = (birthDateStr: string | null) => {
     if (!birthDateStr) return 'Não informado';
     try {
@@ -320,13 +342,7 @@ export default function ClientsManager() {
                           <span>{format(parseISO(lastEntry.reservation_date), 'dd/MM/yyyy')}</span>
                           {lastEntry.entered_at && (
                             <span className="text-white/40 font-medium">
-                              {(() => {
-                                try {
-                                  return ` • ${format(parseISO(lastEntry.entered_at), 'HH:mm')}`;
-                                } catch {
-                                  return '';
-                                }
-                              })()}
+                              • {formatToBrlDateTime(lastEntry.entered_at).split(' ')[1] || ''}
                             </span>
                           )}
                         </div>
@@ -459,13 +475,7 @@ export default function ClientsManager() {
                                     </span>
                                     {res.entered_at && (
                                       <span className="text-[9px] font-bold text-white/30 block mt-0.5">
-                                        {(() => {
-                                          try {
-                                            return format(parseISO(res.entered_at), 'dd/MM/yyyy HH:mm');
-                                          } catch {
-                                            return res.entered_at;
-                                          }
-                                        })()}
+                                        {formatToBrlDateTime(res.entered_at)}
                                       </span>
                                     )}
                                   </div>

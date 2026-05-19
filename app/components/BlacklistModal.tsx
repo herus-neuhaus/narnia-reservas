@@ -62,33 +62,23 @@ export default function BlacklistModal({ isOpen, onClose, onSuccess }: Blacklist
               onChange={(e) => {
                 const cpfValue = formatCPF(e.target.value);
                 setBlacklistFormData({...blacklistFormData, cpf: cpfValue});
-                
-                // Auto-fill name if CPF is found in past reservations, otherwise fallback to CPFHub.io
-                const cleanCpf = cpfValue.replace(/\D/g, '');
+                               const cleanCpf = cpfValue.replace(/\D/g, '');
                 if (cleanCpf.length === 11) {
+                  if (!cpf.isValid(cleanCpf)) {
+                    return;
+                  }
+
                   setIsCpfLoading(true);
                   supabase
                     .rpc('get_reservations_by_cpf', { p_cpf: cpfValue })
                     .then(({ data, error }) => {
+                      setIsCpfLoading(false);
                       if (!error && data && data.length > 0) {
                         const latest = data[0];
-                        setIsCpfLoading(false);
                         setBlacklistFormData(prev => ({
                           ...prev,
                           name: latest.name || prev.name
                         }));
-                      } else {
-                        // Fall back to CPFHub.io lookup API
-                        fetch(`/api/cpf/${cleanCpf}`)
-                          .then(res => res.json())
-                          .then(resData => {
-                            setIsCpfLoading(false);
-                            // Do not prefill name anymore as requested by the user
-                          })
-                          .catch(err => {
-                            console.error('Error fetching from CPFHub:', err);
-                            setIsCpfLoading(false);
-                          });
                       }
                     });
                 }

@@ -54,6 +54,8 @@ export type Database = {
           event_date: string
           name: string
           image_url: string
+          list_limit_time: string | null
+          list_limit_capacity: number | null
         }
         Insert: {
           id?: string
@@ -61,6 +63,8 @@ export type Database = {
           event_date: string
           name: string
           image_url: string
+          list_limit_time?: string | null
+          list_limit_capacity?: number | null
         }
         Update: {
           id?: string
@@ -68,6 +72,8 @@ export type Database = {
           event_date?: string
           name?: string
           image_url?: string
+          list_limit_time?: string | null
+          list_limit_capacity?: number | null
         }
         Relationships: []
       }
@@ -124,6 +130,7 @@ export type Database = {
           check_in_status: string | null
           expires_at: string | null
           entered_at: string | null
+          photo: string | null
         }
         Insert: {
           created_at?: string
@@ -147,6 +154,7 @@ export type Database = {
           check_in_status?: string | null
           expires_at?: string | null
           entered_at?: string | null
+          photo?: string | null
         }
         Update: {
           created_at?: string
@@ -170,6 +178,7 @@ export type Database = {
           check_in_status?: string | null
           expires_at?: string | null
           entered_at?: string | null
+          photo?: string | null
         }
         Relationships: [
           {

@@ -5,12 +5,14 @@ import { XCircle, Loader2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { format, parseISO, differenceInYears } from 'date-fns';
 import { cpf } from 'cpf-cnpj-validator';
+import CameraCapture from './CameraCapture';
 
 interface QuickAddModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: (newReservation: any) => void;
   onBlocked: (blockedInfo: any) => void;
+  onDuplicate: (duplicateInfo: any) => void;
   blacklist: any[];
   reservations: any[];
 }
@@ -20,6 +22,7 @@ export default function QuickAddModal({
   onClose,
   onSuccess,
   onBlocked,
+  onDuplicate,
   blacklist,
   reservations
 }: QuickAddModalProps) {
@@ -30,8 +33,9 @@ export default function QuickAddModal({
     cpf: '', 
     birth_date: '',
     whatsapp: '', 
-    type: 'lista' as 'lista' | 'mesa' | 'camarote' | 'pulseira', 
-    location_id: '' 
+    type: 'pulseira' as 'lista' | 'mesa' | 'camarote' | 'pulseira', 
+    location_id: '',
+    photo: null as string | null
   });
 
   const supabase = createClient();
@@ -81,6 +85,14 @@ export default function QuickAddModal({
       return;
     }
 
+    // Prevent duplicate entries for the same CPF today
+    const cleanCpfInput = quickFormData.cpf.replace(/\D/g, '');
+    const alreadyHasReservation = reservations.find(r => r.cpf && r.cpf.replace(/\D/g, '') === cleanCpfInput);
+    if (alreadyHasReservation) {
+      onDuplicate(alreadyHasReservation);
+      return;
+    }
+
     setIsAdding(true);
     const today = format(new Date(), 'yyyy-MM-dd');
 
@@ -116,17 +128,30 @@ export default function QuickAddModal({
         location_id: (quickFormData.type === 'mesa' || quickFormData.type === 'camarote') ? quickFormData.location_id : null,
         check_in_status: 'entered',
         entered_at: getPortoVelhoTime(),
-        num_guests: 1
+        num_guests: 1,
+        photo: quickFormData.photo
       }])
       .select()
       .single();
 
     if (!error && data) {
       onSuccess(data);
-      setQuickFormData({ name: '', cpf: '', birth_date: '', whatsapp: '', type: 'lista', location_id: '' });
+      setQuickFormData({ name: '', cpf: '', birth_date: '', whatsapp: '', type: 'pulseira', location_id: '', photo: null });
       onClose();
     } else {
-      alert('Erro ao cadastrar: ' + (error?.message || 'Desconhecido'));
+      const isDuplicate = error?.code === '23505' || error?.message?.includes('duplicate key') || error?.message?.includes('unique_reservation_date_cpf');
+      if (isDuplicate) {
+        onDuplicate({
+          name: quickFormData.name,
+          cpf: quickFormData.cpf,
+          type: quickFormData.type,
+          reservation_date: today,
+          reservation_time: format(new Date(), 'HH:mm'),
+          check_in_status: 'entered'
+        });
+      } else {
+        alert('Erro ao cadastrar: ' + (error?.message || 'Desconhecido'));
+      }
     }
     setIsAdding(false);
   };
@@ -143,7 +168,15 @@ export default function QuickAddModal({
           </button>
         </div>
         
-        <div className="space-y-4">
+        <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2 custom-scrollbar">
+          <div className="flex flex-col items-center justify-center pb-4 border-b border-white/5">
+            <label className="text-[10px] font-bold uppercase tracking-widest text-white/30 mb-2">Foto do Cliente (Opcional)</label>
+            <CameraCapture
+              onPhotoCaptured={(photoBase64) => setQuickFormData(prev => ({ ...prev, photo: photoBase64 }))}
+              initialPhoto={quickFormData.photo}
+            />
+          </div>
+
           <div className="relative">
             <label className="text-[10px] font-bold uppercase tracking-widest text-white/30 ml-4 mb-1 block">CPF (Obrigatório)</label>
             <input 
@@ -151,18 +184,30 @@ export default function QuickAddModal({
               value={quickFormData.cpf}
               onChange={(e) => {
                 const cpfValue = formatCPF(e.target.value);
-                setQuickFormData({...quickFormData, cpf: cpfValue});
-                
-                // Auto-fill registration if CPF is found in past reservations, otherwise fallback to CPFHub.io
                 const cleanCpf = cpfValue.replace(/\D/g, '');
+                
+                // Clear pre-filled fields on change to prevent showing stale data from the previous CPF lookup
+                setQuickFormData(prev => ({
+                  ...prev,
+                  cpf: cpfValue,
+                  name: '',
+                  birth_date: '',
+                  whatsapp: '',
+                  photo: null
+                }));
+                
                 if (cleanCpf.length === 11) {
+                  if (!cpf.isValid(cleanCpf)) {
+                    return;
+                  }
+
                   setIsCpfLoading(true);
                   supabase
                     .rpc('get_reservations_by_cpf', { p_cpf: cpfValue })
                     .then(({ data, error }) => {
+                      setIsCpfLoading(false);
                       if (!error && data && data.length > 0) {
                         const latest = data[0];
-                        setIsCpfLoading(false);
                         
                         // Validate age
                         if (latest.birth_date) {
@@ -176,43 +221,9 @@ export default function QuickAddModal({
                           ...prev,
                           name: latest.name || prev.name,
                           whatsapp: latest.whatsapp || prev.whatsapp,
-                          birth_date: latest.birth_date || prev.birth_date || ''
+                          birth_date: latest.birth_date || prev.birth_date || '',
+                          photo: latest.photo || prev.photo
                         }));
-                      } else {
-                        // Fall back to CPFHub.io lookup API
-                        fetch(`/api/cpf/${cleanCpf}`)
-                          .then(res => res.json())
-                          .then(resData => {
-                            setIsCpfLoading(false);
-                            if (resData.success && resData.data) {
-                              const info = resData.data;
-                              let birthDateFormatted = '';
-                              if (info.birthDate) {
-                                const parts = info.birthDate.split('/');
-                                if (parts.length === 3) {
-                                  birthDateFormatted = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
-                                }
-                              }
-                              
-                              // Validate age
-                              if (birthDateFormatted) {
-                                const age = differenceInYears(new Date(), parseISO(birthDateFormatted));
-                                if (age < 18) {
-                                  alert('Acesso Restrito: O Nárnia Club permite a entrada apenas para pessoas com 18 anos ou mais.');
-                                }
-                              }
-
-                              setQuickFormData(prev => ({
-                                ...prev,
-                                // Do not prefill name anymore
-                                birth_date: birthDateFormatted || prev.birth_date
-                              }));
-                            }
-                          })
-                          .catch(err => {
-                            console.error('Error fetching from CPFHub:', err);
-                            setIsCpfLoading(false);
-                          });
                       }
                     });
                 }
@@ -262,10 +273,8 @@ export default function QuickAddModal({
 
           <div>
             <label className="text-[10px] font-bold uppercase tracking-widest text-white/30 ml-4 mb-1 block">Tipo de Acesso</label>
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               {[
-                { id: 'lista', label: 'Lista' },
-                { id: 'mesa', label: 'Mesa' },
                 { id: 'camarote', label: 'VIP' },
                 { id: 'pulseira', label: 'Pulseira' }
               ].map((t) => (
@@ -273,7 +282,7 @@ export default function QuickAddModal({
                   key={t.id}
                   type="button"
                   onClick={() => setQuickFormData({ ...quickFormData, type: t.id as any, location_id: '' })}
-                  className={`py-3 rounded-xl text-[10px] font-bold uppercase border transition-all ${quickFormData.type === t.id ? 'bg-[#D4AF37] border-[#D4AF37] text-black' : 'bg-black border-white/10 text-white/40'}`}
+                  className={`py-4 rounded-xl text-xs font-bold uppercase border transition-all ${quickFormData.type === t.id ? 'bg-[#D4AF37] border-[#D4AF37] text-black shadow-lg shadow-[#D4AF37]/10' : 'bg-black border-white/10 text-white/40 hover:text-white/60'}`}
                 >
                   {t.label}
                 </button>

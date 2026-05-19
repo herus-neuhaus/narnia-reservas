@@ -3,11 +3,15 @@
 import React, { useState } from 'react';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { CalendarDays, AlertCircle } from 'lucide-react';
+import { CalendarDays, AlertCircle, Clock } from 'lucide-react';
 import { Database } from '@/lib/supabase/database.types';
 import CalendarPicker from './CalendarPicker';
 
-type EventRow = Database['public']['Tables']['events']['Row'];
+type EventRow = Database['public']['Tables']['events']['Row'] & {
+  description?: string | null;
+  start_time?: string | null;
+  banner_url?: string | null;
+};
 
 interface EventPickerProps {
   selectedDate: string;
@@ -119,7 +123,7 @@ export default function EventPicker({
             {/* Imagem de Fundo (Capa) */}
             <div className="absolute inset-0 z-0">
               <img 
-                src={event.image_url} 
+                src={event.banner_url || event.image_url || '/placeholder.png'} 
                 alt={event.name} 
                 className="w-full h-full object-cover opacity-60 group-hover:opacity-80 transition-opacity duration-500"
               />
@@ -135,6 +139,14 @@ export default function EventPicker({
                 <h3 className="text-2xl sm:text-3xl font-black uppercase tracking-tight text-white drop-shadow-md leading-none">
                   {event.name}
                 </h3>
+                {event.list_limit_time && (
+                  <div className="flex items-center gap-1.5 mt-2.5 bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/5 w-fit">
+                    <Clock size={11} className="text-[#D4AF37]" />
+                    <span className="text-[9px] font-black uppercase tracking-wider text-white/60">
+                      Lista até {event.list_limit_time.substring(0, 5)}
+                    </span>
+                  </div>
+                )}
               </div>
               
               <div className="bg-black/60 backdrop-blur-md border border-white/10 px-5 py-3 rounded-2xl shrink-0 flex flex-col items-center justify-center">
