@@ -51,9 +51,31 @@ export default function PortariaDashboard() {
   const fetchTodaysData = async () => {
     setLoading(true);
     
-    // Check if user is admin to show return button
-    const { data: { user } } = await supabase.auth.getUser();
-    setIsAdmin(user?.email === 'narnia@admin.com');
+    // Check session first
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      router.push('/login');
+      return;
+    }
+
+    // Get user role from profiles
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', session.user.id)
+      .single();
+
+    const role = profile?.role || 'customer';
+    const isAuthorized = ['dono', 'gerente', 'portaria', 'admin'].includes(role) || session.user.email === 'narnia@admin.com';
+
+    if (!isAuthorized) {
+      console.warn('User not authorized for Portaria');
+      router.push('/login');
+      return;
+    }
+
+    // Show admin return button if user has admin privileges
+    setIsAdmin(['dono', 'gerente', 'admin'].includes(role) || session.user.email === 'narnia@admin.com');
 
     const { data: resData } = await supabase
       .from('reservations')

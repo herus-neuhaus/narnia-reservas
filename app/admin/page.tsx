@@ -79,6 +79,7 @@ export default function AdminDashboard() {
   const [endDate, setEndDate] = useState(format(startOfToday(), 'yyyy-MM-dd'));
   const [quickFilter, setQuickFilter] = useState('Hoje');
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [isAuthorized, setIsAuthorized] = useState(false);
   
   const supabase = createClient();
   const router = useRouter();
@@ -91,13 +92,26 @@ export default function AdminDashboard() {
         router.push('/login');
         return;
       }
-      
-      const role = session.user.app_metadata?.role;
-      const isAdminEmail = session.user.email === 'narnia@admin.com';
 
-      if (role !== 'admin' && !isAdminEmail) {
-        console.warn('User is not an admin');
-        // router.push('/'); // Optional: redirect non-admins
+      // Check role dynamically from profiles table
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', session.user.id)
+        .single();
+        
+      const role = profile?.role || 'customer';
+      const isAuthAdmin = ['dono', 'gerente', 'admin'].includes(role) || session.user.email === 'narnia@admin.com';
+
+      if (!isAuthAdmin) {
+        console.warn('User not authorized for Admin panel');
+        if (role === 'portaria') {
+          router.push('/portaria');
+        } else {
+          router.push('/login');
+        }
+      } else {
+        setIsAuthorized(true);
       }
     };
     checkAuth();
@@ -182,6 +196,17 @@ export default function AdminDashboard() {
     res.whatsapp.includes(searchTerm) ||
     res.cpf?.includes(searchTerm)
   );
+
+  if (!isAuthorized) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center text-white">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="w-12 h-12 text-[#D4AF37] animate-spin" />
+          <p className="text-xs uppercase tracking-[0.2em] text-[#D4AF37] font-serif font-black">Autenticando...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-black font-sans text-white flex flex-col lg:flex-row overflow-hidden">

@@ -319,7 +319,15 @@ export default function ClientsManager() {
                           <Calendar size={12} />
                           <span>{format(parseISO(lastEntry.reservation_date), 'dd/MM/yyyy')}</span>
                           {lastEntry.entered_at && (
-                            <span className="text-white/40 font-medium">• {lastEntry.entered_at.split(' ')[1]?.substring(0, 5)}</span>
+                            <span className="text-white/40 font-medium">
+                              {(() => {
+                                try {
+                                  return ` • ${format(parseISO(lastEntry.entered_at), 'HH:mm')}`;
+                                } catch {
+                                  return '';
+                                }
+                              })()}
+                            </span>
                           )}
                         </div>
                       ) : (
@@ -425,43 +433,51 @@ export default function ClientsManager() {
                         <h4 className="text-[10px] font-black uppercase tracking-widest text-white/60">Histórico de Visitas</h4>
                       </div>
                       
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {client.reservations.map((res) => (
-                          <div 
-                            key={res.id}
-                            className="bg-black/40 p-4 rounded-2xl border border-white/5 flex items-center justify-between gap-4 hover:border-white/10 transition-colors"
-                          >
-                            <div className="space-y-1">
-                              <div className="flex items-center gap-2">
-                                <span className="text-[10px] font-black uppercase tracking-tighter bg-white/5 px-2 py-0.5 rounded text-white/60">
-                                  {res.type === 'camarote' ? 'VIP' : res.type === 'mesa' ? 'Mesa' : res.type === 'pulseira' ? 'Pulseira' : 'Lista'} {res.location_id}
-                                </span>
-                                <span className="text-xs font-bold">{format(parseISO(res.reservation_date), 'dd/MM/yyyy')}</span>
-                              </div>
-                              <p className="text-[10px] text-white/30">Horário da reserva: {res.reservation_time.substring(0, 5)}</p>
-                            </div>
-
-                            <div className="flex items-center gap-2">
-                              {/* Check-In Status indicator */}
-                              {res.check_in_status === 'entered' ? (
-                                <div className="text-right">
-                                  <span className="px-2.5 py-1 bg-green-500/10 border border-green-500/20 text-green-500 text-[9px] font-black uppercase rounded-lg tracking-widest block">
-                                    Entrou
+                      <div className="max-h-[250px] overflow-y-auto pr-2 custom-scrollbar">
+                        <div className="flex flex-col gap-4">
+                          {client.reservations.map((res) => (
+                            <div 
+                              key={res.id}
+                              className="bg-black/40 p-4 rounded-2xl border border-white/5 flex items-center justify-between gap-4 hover:border-white/10 transition-colors"
+                            >
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[10px] font-black uppercase tracking-tighter bg-white/5 px-2 py-0.5 rounded text-white/60">
+                                    {res.type === 'camarote' ? 'VIP' : res.type === 'mesa' ? 'Mesa' : res.type === 'pulseira' ? 'Pulseira' : 'Lista'} {res.location_id}
                                   </span>
-                                  {res.entered_at && (
-                                    <span className="text-[9px] font-bold text-white/30 block mt-0.5">
-                                      {res.entered_at.split(' ')[1]?.substring(0, 5) || res.entered_at}
-                                    </span>
-                                  )}
+                                  <span className="text-xs font-bold">{format(parseISO(res.reservation_date), 'dd/MM/yyyy')}</span>
                                 </div>
-                              ) : (
-                                <span className="px-2.5 py-1 bg-white/5 border border-white/10 text-white/30 text-[9px] font-black uppercase rounded-lg tracking-widest block">
-                                  Não Entrou
-                                </span>
-                              )}
+                                <p className="text-[10px] text-white/30">Horário da reserva: {res.reservation_time.substring(0, 5)}</p>
+                              </div>
+
+                              <div className="flex items-center gap-2">
+                                {/* Check-In Status indicator */}
+                                {res.check_in_status === 'entered' ? (
+                                  <div className="text-right">
+                                    <span className="px-2.5 py-1 bg-green-500/10 border border-green-500/20 text-green-500 text-[9px] font-black uppercase rounded-lg tracking-widest block">
+                                      Entrou
+                                    </span>
+                                    {res.entered_at && (
+                                      <span className="text-[9px] font-bold text-white/30 block mt-0.5">
+                                        {(() => {
+                                          try {
+                                            return format(parseISO(res.entered_at), 'dd/MM/yyyy HH:mm');
+                                          } catch {
+                                            return res.entered_at;
+                                          }
+                                        })()}
+                                      </span>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <span className="px-2.5 py-1 bg-white/5 border border-white/10 text-white/30 text-[9px] font-black uppercase rounded-lg tracking-widest block">
+                                    Não Entrou
+                                  </span>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          ))}
+                        </div>
                       </div>
                     </div>
 

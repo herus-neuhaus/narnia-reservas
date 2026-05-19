@@ -21,15 +21,36 @@ export default function LoginPage() {
     setError(null);
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error: authError } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
-      if (error) {
-        setError(error.message);
-      } else {
-        router.push('/admin');
+      if (authError) {
+        setError(authError.message);
+      } else if (data?.session) {
+        // Query the profile role dynamically
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', data.session.user.id)
+          .single();
+
+        if (profileError) {
+          console.error('Error fetching user profile during login:', profileError);
+        }
+
+        const role = profile?.role || 'customer';
+        const isAuthAdmin = ['dono', 'gerente', 'admin'].includes(role) || data.session.user.email === 'narnia@admin.com';
+        
+        if (role === 'portaria') {
+          router.push('/portaria');
+        } else if (isAuthAdmin) {
+          router.push('/admin');
+        } else {
+          setError('Acesso negado: Perfil não autorizado para o painel de funcionários.');
+          await supabase.auth.signOut();
+        }
         router.refresh();
       }
     } catch (err) {
