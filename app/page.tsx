@@ -132,7 +132,14 @@ export default function NarniaClubPortal() {
       .gte('event_date', format(startOfToday(), 'yyyy-MM-dd'))
       .order('event_date', { ascending: true });
     
-    if (data) setEvents(data);
+    if (data) {
+      const now = new Date();
+      const visibleEvents = data.filter((e: any) => {
+        if (!e.visible_from) return true;
+        return new Date(e.visible_from) <= now;
+      });
+      setEvents(visibleEvents);
+    }
     setLoadingEvents(false);
   };
 

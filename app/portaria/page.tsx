@@ -45,6 +45,7 @@ export default function PortariaDashboard() {
   const [blacklistAlert, setBlacklistAlert] = useState<Blacklist | null>(null);
   const [duplicateAlert, setDuplicateAlert] = useState<any | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isReceptionist, setIsReceptionist] = useState(false);
   const [photoCaptureModalData, setPhotoCaptureModalData] = useState<{ reservationId: string; currentStatus: string | null } | null>(null);
   const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
 
@@ -85,6 +86,7 @@ export default function PortariaDashboard() {
 
     // Show admin return button if user has admin privileges
     setIsAdmin(['dono', 'gerente', 'admin'].includes(role) || session.user.email === 'narnia@admin.com');
+    setIsReceptionist(role === 'receptionist');
 
     const { data: resData } = await supabase
       .from('reservations')
@@ -235,6 +237,11 @@ export default function PortariaDashboard() {
   const handleCheckInClick = async (id: string, currentStatus: string | null) => {
     const res = reservations.find(r => r.id === id);
     if (!res) return;
+
+    if (currentStatus === 'entered' && isReceptionist) {
+      alert('Você não tem permissão para cancelar uma entrada. Procure a gerência.');
+      return;
+    }
 
     const hasPhoto = res.customers?.photo || res.photo;
 
@@ -424,7 +431,12 @@ export default function PortariaDashboard() {
                   </div>
                   <button 
                     onClick={() => handleCheckInClick(searchResult.id, searchResult.check_in_status)}
-                    className={`w-full sm:w-auto px-10 py-5 rounded-2xl font-black uppercase tracking-widest text-sm shadow-xl transition-all active:scale-95 ${searchResult.check_in_status === 'entered' ? 'bg-red-500 text-white hover:bg-red-600' : 'bg-black text-white hover:bg-black/80'}`}
+                    disabled={searchResult.check_in_status === 'entered' && isReceptionist}
+                    className={`w-full sm:w-auto px-10 py-5 rounded-2xl font-black uppercase tracking-widest text-sm shadow-xl transition-all active:scale-95 ${
+                      searchResult.check_in_status === 'entered' 
+                        ? (isReceptionist ? 'bg-white/10 text-white/40 cursor-not-allowed' : 'bg-red-500 text-white hover:bg-red-600') 
+                        : 'bg-black text-white hover:bg-black/80'
+                    }`}
                   >
                     {searchResult.check_in_status === 'entered' ? 'Cancelar Entrada' : 'CONFIRMAR ENTRADA'}
                   </button>
@@ -508,12 +520,14 @@ export default function PortariaDashboard() {
                   <div className="flex items-center gap-2">
                     <button 
                       onClick={() => handleCheckInClick(res.id, res.check_in_status)}
-                      className={`p-3 rounded-2xl transition-all active:scale-90 ${res.check_in_status === 'entered' ? 'bg-green-500 text-black shadow-[0_0_15px_rgba(34,197,94,0.4)]' : 'bg-white/5 text-white/20 hover:bg-white/10 hover:text-white'}`}
+                      disabled={res.check_in_status === 'entered' && isReceptionist}
+                      className={`p-3 rounded-2xl transition-all active:scale-90 ${
+                        res.check_in_status === 'entered' 
+                          ? (isReceptionist ? 'bg-green-500/20 text-green-500/50 cursor-not-allowed shadow-none' : 'bg-green-500 text-black shadow-[0_0_15px_rgba(34,197,94,0.4)]') 
+                          : 'bg-white/5 text-white/20 hover:bg-white/10 hover:text-white'
+                      }`}
                     >
                       <CheckCircle2 size={24} />
-                    </button>
-                    <button className="p-3 bg-white/5 text-white/20 rounded-2xl hover:bg-red-500/20 hover:text-red-500 transition-all opacity-0 group-hover:opacity-100">
-                      <XCircle size={24} />
                     </button>
                   </div>
                 </div>

@@ -53,6 +53,7 @@ function AdminDashboardContent() {
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [blacklist, setBlacklist] = useState<Blacklist[]>([]);
   const [isBlacklistModalOpen, setIsBlacklistModalOpen] = useState(false);
+  const [blacklistInitialData, setBlacklistInitialData] = useState<{cpf: string, name: string} | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -401,7 +402,10 @@ function AdminDashboardContent() {
           </div>
         ) : currentView === 'clientes' ? (
           <div className="max-w-7xl mx-auto w-full animate-in fade-in slide-in-from-bottom-4">
-            <ClientsManager />
+            <ClientsManager onBlockRequest={(client) => {
+              setBlacklistInitialData(client);
+              setIsBlacklistModalOpen(true);
+            }} />
           </div>
         ) : currentView === 'events' ? (
           <div className="max-w-7xl mx-auto w-full animate-in fade-in slide-in-from-bottom-4">
@@ -470,8 +474,12 @@ function AdminDashboardContent() {
 
       <BlacklistModal 
         isOpen={isBlacklistModalOpen} 
-        onClose={() => setIsBlacklistModalOpen(false)} 
+        onClose={() => {
+          setIsBlacklistModalOpen(false);
+          setBlacklistInitialData(null);
+        }} 
         onSuccess={addToBlacklist} 
+        initialData={blacklistInitialData}
       />
 
       {selectedReservation && (

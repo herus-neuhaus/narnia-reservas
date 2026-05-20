@@ -32,7 +32,11 @@ interface ClientRecord {
   photo?: string | null;
 }
 
-export default function ClientsManager() {
+interface ClientsManagerProps {
+  onBlockRequest?: (client: { cpf: string; name: string }) => void;
+}
+
+export default function ClientsManager({ onBlockRequest }: ClientsManagerProps = {}) {
   const [clients, setClients] = useState<ClientRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -271,7 +275,7 @@ export default function ClientsManager() {
                 >
                   <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6 w-full lg:w-auto">
                     {/* Avatar Badge */}
-                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center border shrink-0 transition-transform overflow-hidden ${
+                    <div className={`w-23 h-23 rounded-2xl flex items-center justify-center border shrink-0 transition-transform overflow-hidden ${
                       client.isBlacklisted ? 'bg-red-500/10 border-red-500/30 text-red-500' :
                       stats.entered >= 2 ? 'bg-[#D4AF37]/10 border-[#D4AF37]/20 text-[#D4AF37]' :
                       'bg-white/5 border-white/10 text-white/30'
@@ -404,14 +408,24 @@ export default function ClientsManager() {
                             </div>
                           </div>
                         ) : (
-                          <div className="space-y-3 text-xs">
-                            <div className="flex items-center gap-2 text-green-500">
-                              <CheckCircle size={18} />
-                              <span className="text-xs font-black uppercase tracking-wider">Acesso Liberado</span>
+                          <div className="space-y-3 text-xs flex flex-col h-full justify-between">
+                            <div>
+                              <div className="flex items-center gap-2 text-green-500 mb-2">
+                                <CheckCircle size={18} />
+                                <span className="text-xs font-black uppercase tracking-wider">Acesso Liberado</span>
+                              </div>
+                              <p className="text-white/40 leading-relaxed">
+                                O cliente não possui pendências ou restrições de entrada registradas no Nárnia Club. Acesso autorizado pela portaria.
+                              </p>
                             </div>
-                            <p className="text-white/40 leading-relaxed">
-                              O cliente não possui pendências ou restrições de entrada registradas no Nárnia Club. Acesso autorizado pela portaria.
-                            </p>
+                            {onBlockRequest && (
+                              <button 
+                                onClick={() => onBlockRequest({ cpf: client.cpf, name: client.name })}
+                                className="w-full mt-4 py-3 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2"
+                              >
+                                <ShieldAlert size={14} /> Bloquear Cliente
+                              </button>
+                            )}
                           </div>
                         )}
                       </div>

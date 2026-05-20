@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const body = await req.json();
-    const { title, date, description, start_time, list_limit_capacity, list_limit_time, banner_url } = body;
+    const { title, date, description, start_time, list_limit_capacity, list_limit_time, banner_url, visible_from } = body;
 
     if (!title || !date) {
       return NextResponse.json(
@@ -30,7 +30,8 @@ export async function POST(req: NextRequest) {
           list_limit_capacity: list_limit_capacity ? parseInt(list_limit_capacity, 10) : 0,
           list_limit_time: list_limit_time || null,
           banner_url,
-          image_url: banner_url
+          image_url: banner_url,
+          visible_from: visible_from || null
         }
       ])
       .select()

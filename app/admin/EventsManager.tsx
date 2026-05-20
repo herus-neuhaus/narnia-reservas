@@ -4,12 +4,14 @@ import React, { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Database } from '@/lib/supabase/database.types';
 import { format, parseISO } from 'date-fns';
-import { Loader2, Plus, Trash2, Image as ImageIcon, Clock, Check, X, Edit2, Users, FileText } from 'lucide-react';
+import { Loader2, Plus, Trash2, Image as ImageIcon, Clock, Check, X, Edit2, Users, FileText, LayoutDashboard } from 'lucide-react';
+import EventOverviewModal from '../components/EventOverviewModal';
 
 type EventRow = Database['public']['Tables']['events']['Row'] & {
   description?: string | null;
   start_time?: string | null;
   banner_url?: string | null;
+  visible_from?: string | null;
 };
 
 export default function EventsManager() {
@@ -18,6 +20,7 @@ export default function EventsManager() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [overviewEvent, setOverviewEvent] = useState<EventRow | null>(null);
 
   // States for inline editing of list limit time
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -29,6 +32,11 @@ export default function EventsManager() {
   const [editingCapacity, setEditingCapacity] = useState<string>('');
   const [isUpdatingCapacity, setIsUpdatingCapacity] = useState<boolean>(false);
 
+  // States for inline editing of visible from
+  const [editingVisibleFromId, setEditingVisibleFromId] = useState<string | null>(null);
+  const [editingVisibleFrom, setEditingVisibleFrom] = useState<string>('');
+  const [isUpdatingVisibleFrom, setIsUpdatingVisibleFrom] = useState<boolean>(false);
+
   const [formData, setFormData] = useState({
     name: '',
     event_date: '',
@@ -36,6 +44,7 @@ export default function EventsManager() {
     start_time: '22:00',
     list_limit_time: '23:30',
     list_limit_capacity: '',
+    visible_from: '',
     banner_url: '',
     image_file: null as File | null
   });
@@ -102,7 +111,8 @@ export default function EventsManager() {
           start_time: formData.start_time || '22:00',
           list_limit_capacity: formData.list_limit_capacity || '0',
           list_limit_time: formData.list_limit_time || '23:30',
-          banner_url: formData.banner_url
+          banner_url: formData.banner_url,
+          visible_from: formData.visible_from ? new Date(formData.visible_from).toISOString() : null
         })
       });
 
@@ -119,6 +129,7 @@ export default function EventsManager() {
         start_time: '22:00', 
         list_limit_time: '23:30', 
         list_limit_capacity: '', 
+        visible_from: '',
         banner_url: '', 
         image_file: null 
       });
@@ -168,6 +179,25 @@ export default function EventsManager() {
       alert('Erro ao atualizar limite de lista: ' + error.message);
     } finally {
       setIsUpdatingCapacity(false);
+    }
+  };
+
+  const handleSaveVisibleFrom = async (id: string) => {
+    setIsUpdatingVisibleFrom(true);
+    try {
+      const val = editingVisibleFrom ? new Date(editingVisibleFrom).toISOString() : null;
+      const { error } = await supabase
+        .from('events')
+        .update({ visible_from: val })
+        .eq('id', id);
+
+      if (error) throw error;
+      setEditingVisibleFromId(null);
+      fetchEvents();
+    } catch (error: any) {
+      alert('Erro ao atualizar data de liberação: ' + error.message);
+    } finally {
+      setIsUpdatingVisibleFrom(false);
     }
   };
 
@@ -250,6 +280,15 @@ export default function EventsManager() {
                 onChange={e => setFormData({...formData, list_limit_capacity: e.target.value})}
                 placeholder="Ex: 200"
                 className="w-full px-6 py-4 bg-[#0d0d0d] border border-zinc-800 rounded-2xl outline-none focus:border-[#d4af37] focus:ring-1 focus:ring-[#d4af37] transition-all text-white font-bold"
+              />
+            </div>
+            <div className="lg:col-span-5">
+              <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400 ml-4 mb-1 block">Início da Lista e Reservas (Data e Hora que aparece no site)</label>
+              <input 
+                type="datetime-local" 
+                value={formData.visible_from}
+                onChange={e => setFormData({...formData, visible_from: e.target.value})}
+                className="w-full px-6 py-4 bg-[#0d0d0d] border border-zinc-800 rounded-2xl outline-none focus:border-[#d4af37] focus:ring-1 focus:ring-[#d4af37] transition-all text-white font-medium"
               />
             </div>
           </div>
@@ -369,6 +408,55 @@ export default function EventsManager() {
                     </span>
                   </div>
 
+                  {/* Visible From Section */}
+                  <div className="flex items-center justify-between border-t border-white/5 pt-4">
+                    <div className="flex items-center gap-2">
+                      <Clock size={14} className="text-green-500" />
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-white/40">Início Lista/Reservas</span>
+                    </div>
+                    {editingVisibleFromId === event.id ? (
+                      <div className="flex items-center gap-1.5 animate-in fade-in duration-200">
+                        <input 
+                          type="datetime-local" 
+                          value={editingVisibleFrom}
+                          onChange={e => setEditingVisibleFrom(e.target.value)}
+                          className="px-2 py-1 bg-black border border-white/20 rounded-xl text-[10px] font-bold text-white outline-none focus:border-[#D4AF37] w-32"
+                        />
+                        <button 
+                          onClick={() => handleSaveVisibleFrom(event.id)}
+                          disabled={isUpdatingVisibleFrom}
+                          className="p-1.5 bg-[#D4AF37] text-black rounded-lg hover:bg-[#b8962f] active:scale-95 transition-all"
+                          title="Salvar"
+                        >
+                          {isUpdatingVisibleFrom ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check size={12} />}
+                        </button>
+                        <button 
+                          onClick={() => setEditingVisibleFromId(null)}
+                          className="p-1.5 bg-white/5 hover:bg-white/10 text-white rounded-lg active:scale-95 transition-all border border-white/10"
+                          title="Cancelar"
+                        >
+                          <X size={12} />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] font-black text-green-500 text-right leading-tight">
+                          {event.visible_from ? format(parseISO(event.visible_from), 'dd/MM HH:mm') : 'Imediato'}
+                        </span>
+                        <button 
+                          onClick={() => {
+                            setEditingVisibleFromId(event.id);
+                            setEditingVisibleFrom(event.visible_from ? event.visible_from.slice(0, 16) : '');
+                          }}
+                          className="p-1.5 bg-white/5 hover:bg-[#D4AF37] hover:text-black text-white/60 rounded-lg transition-all border border-white/10"
+                          title="Editar"
+                        >
+                          <Edit2 size={10} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
                   {/* List Limit Time Section with inline editing */}
                   <div className="flex items-center justify-between border-t border-white/5 pt-4">
                     <div className="flex items-center gap-2">
@@ -468,12 +556,30 @@ export default function EventsManager() {
                     )}
                   </div>
 
+                  {/* Overview Button */}
+                  <div className="pt-4 mt-2 border-t border-white/5">
+                    <button 
+                      onClick={() => setOverviewEvent(event)}
+                      className="w-full py-3 bg-white/5 hover:bg-[#D4AF37] hover:text-black text-white/60 rounded-xl transition-all border border-white/10 flex items-center justify-center gap-2 font-black uppercase text-[10px] tracking-widest"
+                    >
+                      <LayoutDashboard size={14} />
+                      Visão Geral do Evento
+                    </button>
+                  </div>
+
                 </div>
               </div>
             </div>
           ))
         )}
       </div>
+
+      {/* Overview Modal */}
+      <EventOverviewModal 
+        isOpen={!!overviewEvent}
+        onClose={() => setOverviewEvent(null)}
+        event={overviewEvent}
+      />
     </div>
   );
 }
