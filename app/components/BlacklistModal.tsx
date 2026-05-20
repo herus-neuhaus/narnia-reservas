@@ -60,11 +60,14 @@ export default function BlacklistModal({ isOpen, onClose, onSuccess, initialData
       return;
     }
     
+    const normalize = (str: string) =>
+      str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
     const cleanSearch = searchQuery.replace(/\D/g, '');
-    const term = searchQuery.toLowerCase();
+    const normTerm = normalize(searchQuery);
     
     const filtered = allCustomers.filter(c => 
-      c.name.toLowerCase().includes(term) || 
+      normalize(c.name || '').includes(normTerm) || 
       (cleanSearch && c.cpf && c.cpf.replace(/\D/g, '').includes(cleanSearch)) ||
       (c.whatsapp && c.whatsapp.includes(searchQuery))
     );
@@ -212,14 +215,14 @@ export default function BlacklistModal({ isOpen, onClose, onSuccess, initialData
 
                     setIsCpfLoading(true);
                     supabase
-                      .rpc('get_reservations_by_cpf', { p_cpf: cleanCpf })
+                      .rpc('get_customer_by_cpf', { p_cpf: cleanCpf })
                       .then(({ data, error }) => {
                         setIsCpfLoading(false);
                         if (!error && data && data.length > 0) {
-                          const latest = data[0];
+                          const customer = data[0];
                           setBlacklistFormData(prev => ({
                             ...prev,
-                            name: latest.name || prev.name
+                            name: customer.name || prev.name
                           }));
                         }
                       });

@@ -2,6 +2,10 @@ import { useState, useEffect, useMemo } from 'react';
 import { clientsService } from '../services/clients.service';
 import { ClientRecord } from '../types/clients.types';
 
+/** Strips accents and lowercases – enables accent-insensitive search */
+const normalize = (str: string) =>
+  str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
 export function useClients() {
   const [clients, setClients] = useState<ClientRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -36,7 +40,7 @@ export function useClients() {
     
     return clients.filter(c => {
       // Search
-      const matchesName = c.name.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesName = normalize(c.name).includes(normalize(searchTerm));
       const matchesCpf = cleanSearch ? c.cpf.replace(/\D/g, '').includes(cleanSearch) : false;
       const matchesWhatsapp = cleanSearch ? c.whatsapp.replace(/\D/g, '').includes(cleanSearch) : false;
 

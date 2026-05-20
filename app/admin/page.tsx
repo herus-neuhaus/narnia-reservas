@@ -358,7 +358,7 @@ function AdminDashboardContent() {
              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                {blacklist.filter(b => 
                  !searchTerm ||
-                 b.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                 b.name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().includes(searchTerm.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()) ||
                  b.cpf?.replace(/\D/g, '').includes(searchTerm.replace(/\D/g, ''))
                ).map(b => (
                  <div key={b.id} className="bg-[#0A0A0A] rounded-[32px] border border-white/5 p-6 hover:border-red-500/40 transition-all">

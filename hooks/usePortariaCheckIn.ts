@@ -14,6 +14,10 @@ import { useCustomAlert } from './use-custom-alert';
 export type Reservation = any;
 export type Blacklist = any;
 
+/** Strips accents and lowercases – enables accent-insensitive search */
+const normalize = (str: string) =>
+  str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
 export function usePortariaCheckIn() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -80,17 +84,22 @@ export function usePortariaCheckIn() {
       return;
     }
 
-    const barred = blacklist.find(b => b.cpf === term || b.name.toLowerCase().includes(term.toLowerCase()));
+    const normTerm = normalize(term);
+
+    const barred = blacklist.find(b =>
+      b.cpf === term ||
+      normalize(b.name).includes(normTerm)
+    );
     if (barred) {
       setIsBlacklisted(barred);
     } else {
       setIsBlacklisted(null);
     }
 
-    const found = reservations.find(r => 
-      (r.customers?.cpf || r.cpf) === term || 
-      (r.customers?.whatsapp || r.whatsapp)?.includes(term) || 
-      (r.customers?.name || r.name).toLowerCase().includes(term.toLowerCase())
+    const found = reservations.find(r =>
+      (r.customers?.cpf || r.cpf) === term ||
+      (r.customers?.whatsapp || r.whatsapp)?.includes(term) ||
+      normalize(r.customers?.name || r.name || '').includes(normTerm)
     );
     setSearchResult(found || null);
   };
@@ -233,12 +242,15 @@ export function usePortariaCheckIn() {
     router.push('/login');
   };
 
-  const filteredReservations = reservations.filter(r => 
-    !searchTerm || 
-    r.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    r.cpf?.replace(/\D/g, '').includes(searchTerm.replace(/\D/g, '')) ||
-    r.whatsapp?.includes(searchTerm)
-  );
+  const filteredReservations = reservations.filter(r => {
+    if (!searchTerm) return true;
+    const normTerm = normalize(searchTerm);
+    return (
+      normalize(r.name || '').includes(normTerm) ||
+      r.cpf?.replace(/\D/g, '').includes(searchTerm.replace(/\D/g, '')) ||
+      r.whatsapp?.includes(searchTerm)
+    );
+  });
 
   return {
     loading,
