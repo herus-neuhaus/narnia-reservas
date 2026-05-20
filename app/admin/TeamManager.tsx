@@ -45,21 +45,6 @@ export default function TeamManager({ role }: TeamManagerProps) {
   const supabase = createClient();
   const menuRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    fetchMembers();
-  }, [role]);
-
-  // Close contextual menu when clicking outside
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setActiveMenuId(null);
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
   const fetchMembers = async () => {
     setLoading(true);
     try {
@@ -75,6 +60,7 @@ export default function TeamManager({ role }: TeamManagerProps) {
         headers: {
           Authorization: `Bearer ${token}`,
         },
+        credentials: 'include',
       });
 
       const resData = await res.json();
@@ -89,6 +75,23 @@ export default function TeamManager({ role }: TeamManagerProps) {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchMembers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [role]);
+
+  // Close contextual menu when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setActiveMenuId(null);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const handleInviteSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -120,12 +123,21 @@ export default function TeamManager({ role }: TeamManagerProps) {
       let succeededCount = 0;
       let errorsList: string[] = [];
 
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
       for (const entry of validEntries) {
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+        };
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+
         const response = await fetch('/api/team/create', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers,
+          credentials: 'include',
           body: JSON.stringify({
             name: entry.name,
             email: entry.email,

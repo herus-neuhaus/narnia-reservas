@@ -5,7 +5,7 @@ export async function createClient() {
   const cookieStore = await cookies()
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   // Fornece fallbacks durante o build para evitar erro de inicialização.
   // As variáveis reais devem ser inseridas no Vercel Dashboard.

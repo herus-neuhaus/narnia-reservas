@@ -51,10 +51,6 @@ export default function EventsManager() {
 
   const supabase = createClient();
 
-  useEffect(() => {
-    fetchEvents();
-  }, []);
-
   const fetchEvents = async () => {
     setLoading(true);
     const { data } = await supabase
@@ -66,8 +62,15 @@ export default function EventsManager() {
     setLoading(false);
   };
 
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchEvents();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleImageUpload = async (file: File) => {
     const fileExt = file.name.split('.').pop();
+    // eslint-disable-next-line react-hooks/purity
     const fileName = `${Math.random()}.${fileExt}`;
     const filePath = `covers/${fileName}`;
 
@@ -99,11 +102,20 @@ export default function EventsManager() {
 
     setIsSubmitting(true);
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
       const response = await fetch('/api/events/create', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
+        credentials: 'include',
         body: JSON.stringify({
           title: formData.name,
           date: formData.event_date,

@@ -19,6 +19,7 @@ export type Database = {
           id: string
           created_at: string | null
           cpf: string
+          cpf_digits: string | null
           name: string
           reason: string | null
           start_date: string | null
@@ -29,6 +30,7 @@ export type Database = {
           id?: string
           created_at?: string | null
           cpf: string
+          cpf_digits?: string | null
           name: string
           reason?: string | null
           start_date?: string | null
@@ -39,11 +41,48 @@ export type Database = {
           id?: string
           created_at?: string | null
           cpf?: string
+          cpf_digits?: string | null
           name?: string
           reason?: string | null
           start_date?: string | null
           end_date?: string
           blocked_by?: string | null
+        }
+        Relationships: []
+      }
+      customers: {
+        Row: {
+          id: string
+          created_at: string | null
+          cpf: string
+          cpf_digits: string | null
+          name: string
+          whatsapp: string
+          birth_date: string | null
+          email: string | null
+          photo: string | null
+        }
+        Insert: {
+          id?: string
+          created_at?: string | null
+          cpf: string
+          cpf_digits?: string | null
+          name: string
+          whatsapp: string
+          birth_date?: string | null
+          email?: string | null
+          photo?: string | null
+        }
+        Update: {
+          id?: string
+          created_at?: string | null
+          cpf?: string
+          cpf_digits?: string | null
+          name?: string
+          whatsapp?: string
+          birth_date?: string | null
+          email?: string | null
+          photo?: string | null
         }
         Relationships: []
       }
@@ -185,10 +224,37 @@ export type Database = {
             foreignKeyName: "reservations_customer_id_fkey"
             columns: ["customer_id"]
             isOneToOne: false
-            referencedRelation: "profiles"
+            referencedRelation: "customers"
             referencedColumns: ["id"]
           },
         ]
+      }
+      team_members: {
+        Row: {
+          id: string
+          created_at: string
+          name: string
+          email: string
+          role: string
+          status: string
+        }
+        Insert: {
+          id?: string
+          created_at?: string
+          name: string
+          email: string
+          role: string
+          status?: string
+        }
+        Update: {
+          id?: string
+          created_at?: string
+          name?: string
+          email?: string
+          role?: string
+          status?: string
+        }
+        Relationships: []
       }
       whatsapp_templates: {
         Row: {

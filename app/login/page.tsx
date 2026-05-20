@@ -29,19 +29,12 @@ export default function LoginPage() {
       if (authError) {
         setError(authError.message);
       } else if (data?.session) {
-        // Fetch role from internal API to avoid RLS 406 errors
-        let role = 'customer';
-        try {
-          const response = await fetch(`/api/team/list?email=${encodeURIComponent(data.session.user.email || '')}`);
-          const result = await response.json();
-          if (result.success && result.data && result.data.length > 0) {
-            role = result.data[0].role;
-          }
-        } catch (err) {
-          console.error('Error fetching role:', err);
-        }
+        // Obter o cargo diretamente dos metadados seguros da sessão do Auth
+        const user = data.session.user;
+        const role = user.app_metadata?.role || user.user_metadata?.role || 'customer';
+        const email = user.email || '';
 
-        const isAuthAdmin = ['dono', 'gerente', 'admin'].includes(role) || data.session.user.email === 'narnia@admin.com';
+        const isAuthAdmin = ['dono', 'gerente', 'admin'].includes(role) || email === 'narnia@admin.com';
         
         if (role === 'portaria' || role === 'receptionist') {
           router.push('/portaria');

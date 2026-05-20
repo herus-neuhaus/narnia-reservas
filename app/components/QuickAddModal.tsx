@@ -252,7 +252,7 @@ export default function QuickAddModal({
                   supabase
                     .from('customers')
                     .select('*')
-                    .eq('cpf', cpfValue)
+                    .eq('cpf_digits', cleanCpf)
                     .maybeSingle()
                     .then(({ data, error }) => {
                       if (!error && data) {
@@ -274,7 +274,7 @@ export default function QuickAddModal({
                       } else {
                         // Fallback to legacy reservations check if not in customers yet
                         supabase
-                          .rpc('get_reservations_by_cpf', { p_cpf: cpfValue })
+                          .rpc('get_reservations_by_cpf', { p_cpf: cleanCpf })
                           .then(({ data: pastData, error: pastError }) => {
                             setIsCpfLoading(false);
                             if (!pastError && pastData && pastData.length > 0) {

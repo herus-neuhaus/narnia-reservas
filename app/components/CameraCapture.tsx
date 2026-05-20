@@ -16,22 +16,16 @@ export default function CameraCapture({ onPhotoCaptured, initialPhoto = null }: 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
-  useEffect(() => {
-    setPhoto(initialPhoto);
-  }, [initialPhoto]);
-
-  useEffect(() => {
-    // Cleanup camera stream on unmount
-    return () => {
-      stopCamera();
-    };
-  }, []);
-
-  useEffect(() => {
-    if (isCameraActive && videoRef.current && streamRef.current) {
-      videoRef.current.srcObject = streamRef.current;
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
     }
-  }, [isCameraActive]);
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    setIsCameraActive(false);
+  };
 
   const startCamera = async (mode: 'user' | 'environment' = facingMode) => {
     setError(null);
@@ -61,16 +55,23 @@ export default function CameraCapture({ onPhotoCaptured, initialPhoto = null }: 
     }
   };
 
-  const stopCamera = () => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-      streamRef.current = null;
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setPhoto(initialPhoto);
+  }, [initialPhoto]);
+
+  useEffect(() => {
+    // Cleanup camera stream on unmount
+    return () => {
+      stopCamera();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (isCameraActive && videoRef.current && streamRef.current) {
+      videoRef.current.srcObject = streamRef.current;
     }
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
-    }
-    setIsCameraActive(false);
-  };
+  }, [isCameraActive]);
 
   const toggleFacingMode = async () => {
     const newMode = facingMode === 'user' ? 'environment' : 'user';

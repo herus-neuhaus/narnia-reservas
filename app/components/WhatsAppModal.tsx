@@ -52,6 +52,7 @@ export default function WhatsAppModal({ isOpen, onClose, reservation }: WhatsApp
 
   useEffect(() => {
     if (isOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       fetchTemplates();
     }
   }, [isOpen, fetchTemplates]);

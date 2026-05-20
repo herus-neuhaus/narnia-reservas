@@ -45,7 +45,8 @@ export async function POST(req: NextRequest) {
       email,
       password,
       email_confirm: true,
-      user_metadata: { role: member.role, name: member.name }
+      user_metadata: { name: member.name },
+      app_metadata: { role: member.role }
     });
 
     if (authError) throw authError;

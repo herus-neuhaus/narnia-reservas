@@ -27,27 +27,18 @@ export default function AdminLayoutShell({ children, activeItem }: { children: R
 
   useEffect(() => {
     const checkAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
         router.push('/login');
         return;
       }
 
-      setUserEmail(session.user.email || null);
+      setUserEmail(user.email || null);
 
-      // Check role dynamically via our internal API to avoid RLS 406 errors
-      let role = 'customer';
-      try {
-        const response = await fetch(`/api/team/list?email=${encodeURIComponent(session.user.email || '')}`);
-        const result = await response.json();
-        if (result.success && result.data && result.data.length > 0) {
-          role = result.data[0].role;
-        }
-      } catch (err) {
-        console.error('Error fetching role:', err);
-      }
+      const role = user.app_metadata?.role || user.user_metadata?.role || 'customer';
+      const email = user.email || '';
         
-      const isAuthAdmin = ['dono', 'gerente', 'admin'].includes(role) || session.user.email === 'narnia@admin.com';
+      const isAuthAdmin = ['dono', 'gerente', 'admin'].includes(role) || email === 'narnia@admin.com';
 
       if (!isAuthAdmin) {
         console.warn('User not authorized for Admin panel');

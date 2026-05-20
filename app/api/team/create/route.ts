@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createClient as createAdminClient } from '@supabase/supabase-js';
+import { createClient } from '@/lib/supabase/server';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,7 +17,41 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+    // 1. Validar autenticação do usuário logado
+    const supabase = await createClient();
+    
+    let token: string | undefined;
+    const authHeader = req.headers.get('Authorization');
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.substring(7);
+    }
+
+    const { data: { user }, error: authError } = token 
+      ? await supabase.auth.getUser(token) 
+      : await supabase.auth.getUser();
+
+    if (authError || !user) {
+      console.log('[API Team Create] Erro de autenticação ou usuário não encontrado.');
+      console.log('[API Team Create] Auth error:', authError);
+      console.log('[API Team Create] User data:', user);
+      console.log('[API Team Create] Token:', token ? `Bearer ${token.substring(0, 10)}...` : 'Nenhum token nos headers de autorização');
+      return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 });
+    }
+
+    const userRole = user.app_metadata?.role || user.user_metadata?.role || '';
+    const emailClaim = user.email || '';
+    const isAuthAdmin = ['dono', 'gerente', 'admin'].includes(userRole) || emailClaim === 'narnia@admin.com';
+
+    if (!isAuthAdmin) {
+      console.log('[API Team Create] Permissão insuficiente.');
+      console.log('[API Team Create] User ID:', user.id);
+      console.log('[API Team Create] User Email:', emailClaim);
+      console.log('[API Team Create] User Role (app_metadata):', user.app_metadata?.role);
+      console.log('[API Team Create] User Role (user_metadata):', user.user_metadata?.role);
+      return NextResponse.json({ error: 'Permissão insuficiente.' }, { status: 403 });
+    }
+
+    const supabaseAdmin = createAdminClient(supabaseUrl, supabaseServiceKey);
     
     const body = await req.json();
     const { name, email, role } = body;

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { 
   Search, 
   User, 
@@ -17,134 +17,30 @@ import {
   XCircle,
   Loader2
 } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
 import { format, parseISO, differenceInYears } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
-interface ClientRecord {
-  cpf: string;
-  name: string;
-  whatsapp: string;
-  birth_date: string | null;
-  reservations: any[];
-  isBlacklisted: boolean;
-  blacklistInfo: any | null;
-  photo?: string | null;
-}
+import { useClients } from '../hooks/useClients';
+import { ClientRecord } from '../types/clients.types';
 
 interface ClientsManagerProps {
   onBlockRequest?: (client: { cpf: string; name: string }) => void;
 }
 
 export default function ClientsManager({ onBlockRequest }: ClientsManagerProps = {}) {
-  const [clients, setClients] = useState<ClientRecord[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterType, setFilterType] = useState<'all' | 'blacklisted' | 'frequent'>('all');
-  const [sortBy, setSortBy] = useState<'name' | 'reservations' | 'last_entry'>('reservations');
+  const {
+    filteredClients,
+    loading,
+    error,
+    searchTerm,
+    setSearchTerm,
+    filterType,
+    setFilterType,
+    sortBy,
+    setSortBy
+  } = useClients();
+
   const [expandedCpf, setExpandedCpf] = useState<string | null>(null);
-
-  const supabase = createClient();
-
-  useEffect(() => {
-    const fetchClientsData = async () => {
-      setLoading(true);
-      try {
-        // Fetch all customers with their reservations
-        const { data: custData, error: custError } = await supabase
-          .from('customers')
-          .select('*, reservations(*)')
-          .order('name');
-
-        if (custError) throw custError;
-
-        // Fetch blacklist
-        const { data: blackData, error: blackError } = await supabase
-          .from('blacklist')
-          .select('*');
-
-        if (blackError) throw blackError;
-
-        const blacklistMap = new Map<string, any>();
-        if (blackData) {
-          blackData.forEach(b => {
-            if (b.cpf) {
-              const cleanCpf = b.cpf.replace(/\D/g, '');
-              blacklistMap.set(cleanCpf, b);
-            }
-          });
-        }
-
-        // Construct client records from customers
-        const clientRecords: ClientRecord[] = (custData || []).map(c => {
-          const cleanCpf = c.cpf ? c.cpf.replace(/\D/g, '') : '';
-          const isBlacklisted = blacklistMap.has(cleanCpf);
-          const blacklistInfo = blacklistMap.get(cleanCpf) || null;
-
-          // Sort reservations newest first
-          const sortedReservations = (c.reservations || []).sort((a: any, b: any) => {
-            const dateA = `${a.reservation_date} ${a.reservation_time || '00:00'}`;
-            const dateB = `${b.reservation_date} ${b.reservation_time || '00:00'}`;
-            return dateB.localeCompare(dateA);
-          });
-
-          return {
-            cpf: c.cpf || '',
-            name: c.name,
-            whatsapp: c.whatsapp,
-            birth_date: c.birth_date || null,
-            reservations: sortedReservations,
-            isBlacklisted,
-            blacklistInfo,
-            photo: c.photo || null
-          };
-        });
-
-        setClients(clientRecords);
-      } catch (err) {
-        console.error('Error fetching clients:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchClientsData();
-  }, [supabase]);
-
-  // Filter & Search & Sort
-  const cleanSearch = searchTerm.replace(/\D/g, '');
-  const filteredClients = clients.filter(c => {
-    // Search
-    const matchesName = c.name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCpf = cleanSearch ? c.cpf.replace(/\D/g, '').includes(cleanSearch) : false;
-    const matchesWhatsapp = cleanSearch ? c.whatsapp.replace(/\D/g, '').includes(cleanSearch) : false;
-
-    const matchesSearch = matchesName || matchesCpf || matchesWhatsapp;
-
-    if (!matchesSearch) return false;
-
-    // Filter type
-    if (filterType === 'blacklisted') return c.isBlacklisted;
-    if (filterType === 'frequent') {
-      const entryCount = c.reservations.filter(r => r.check_in_status === 'entered').length;
-      return entryCount >= 2;
-    }
-
-    return true;
-  }).sort((a, b) => {
-    if (sortBy === 'name') {
-      return a.name.localeCompare(b.name);
-    }
-    if (sortBy === 'reservations') {
-      return b.reservations.length - a.reservations.length;
-    }
-    if (sortBy === 'last_entry') {
-      const lastA = a.reservations.find(r => r.check_in_status === 'entered')?.reservation_date || '1970-01-01';
-      const lastB = b.reservations.find(r => r.check_in_status === 'entered')?.reservation_date || '1970-01-01';
-      return lastB.localeCompare(lastA);
-    }
-    return 0;
-  });
 
   const formatToBrlDateTime = (dateStr: string | null) => {
     if (!dateStr) return '';
@@ -190,6 +86,15 @@ export default function ClientsManager({ onBlockRequest }: ClientsManagerProps =
       <div className="flex flex-col items-center justify-center p-20 opacity-40">
         <Loader2 className="animate-spin text-[#D4AF37] mb-4" size={40} />
         <p className="text-xs font-bold uppercase tracking-widest text-[#D4AF37]">Carregando base de clientes...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center p-20 bg-red-500/10 rounded-3xl border border-red-500/20">
+        <AlertTriangle className="text-red-500 mb-4" size={40} />
+        <p className="text-sm font-bold text-red-500 uppercase tracking-widest">Erro ao carregar clientes</p>
       </div>
     );
   }
@@ -254,7 +159,7 @@ export default function ClientsManager({ onBlockRequest }: ClientsManagerProps =
             <p className="text-sm font-bold uppercase tracking-widest">Nenhum cliente encontrado.</p>
           </div>
         ) : (
-          filteredClients.map((client) => {
+          filteredClients.map((client: ClientRecord) => {
             const isExpanded = expandedCpf === client.cpf;
             const stats = getEntryStats(client.reservations);
             const lastEntry = client.reservations.find(r => r.check_in_status === 'entered');
@@ -399,7 +304,7 @@ export default function ClientsManager({ onBlockRequest }: ClientsManagerProps =
                             <div className="bg-red-500/5 p-4 rounded-xl border border-red-500/10 text-xs space-y-2">
                               <div>
                                 <span className="text-white/30 block">Motivo</span>
-                                <span className="font-bold text-white/80">"{client.blacklistInfo.reason || 'Sem motivo informado'}"</span>
+                                <span className="font-bold text-white/80">&quot;{client.blacklistInfo.reason || 'Sem motivo informado'}&quot;</span>
                               </div>
                               <div>
                                 <span className="text-white/30 block">Vigência</span>
@@ -472,7 +377,7 @@ export default function ClientsManager({ onBlockRequest }: ClientsManagerProps =
                                   </span>
                                   <span className="text-xs font-bold">{format(parseISO(res.reservation_date), 'dd/MM/yyyy')}</span>
                                 </div>
-                                <p className="text-[10px] text-white/30">Horário da reserva: {res.reservation_time.substring(0, 5)}</p>
+                                <p className="text-[10px] text-white/30">Horário da reserva: {res.reservation_time?.substring(0, 5)}</p>
                               </div>
 
                               <div className="flex items-center gap-2">

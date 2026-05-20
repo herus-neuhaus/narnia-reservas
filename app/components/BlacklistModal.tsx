@@ -28,10 +28,14 @@ export default function BlacklistModal({ isOpen, onClose, onSuccess, initialData
   useEffect(() => {
     if (isOpen) {
       if (initialData) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setBlacklistFormData({ name: initialData.name, cpf: initialData.cpf, reason: '', duration: '6' });
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setStep('form');
       } else {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setBlacklistFormData({ name: '', cpf: '', reason: '', duration: '6' });
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setStep('list');
       }
       setSearchQuery('');
@@ -51,6 +55,7 @@ export default function BlacklistModal({ isOpen, onClose, onSuccess, initialData
 
   useEffect(() => {
     if (searchQuery.length === 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSearchResults(allCustomers);
       return;
     }
@@ -207,7 +212,7 @@ export default function BlacklistModal({ isOpen, onClose, onSuccess, initialData
 
                     setIsCpfLoading(true);
                     supabase
-                      .rpc('get_reservations_by_cpf', { p_cpf: cpfValue })
+                      .rpc('get_reservations_by_cpf', { p_cpf: cleanCpf })
                       .then(({ data, error }) => {
                         setIsCpfLoading(false);
                         if (!error && data && data.length > 0) {

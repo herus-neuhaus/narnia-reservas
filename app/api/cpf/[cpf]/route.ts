@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { cpf } from 'cpf-cnpj-validator';
 
 export async function GET(
@@ -18,10 +18,17 @@ export async function GET(
       );
     }
 
-    // Check if the CPF already exists in our database reservations
+    // Check if the CPF already exists in our database reservations using Admin Client
     try {
-      const supabase = await createClient();
-      const { data: dbData, error: dbError } = await supabase.rpc('get_reservations_by_cpf', { p_cpf: cleanCpf });
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+      if (!supabaseUrl || !supabaseServiceKey) {
+        throw new Error('Supabase URL or Service Role key is missing.');
+      }
+
+      const supabaseAdmin = createAdminClient(supabaseUrl, supabaseServiceKey);
+      const { data: dbData, error: dbError } = await supabaseAdmin.rpc('get_reservations_by_cpf', { p_cpf: cleanCpf });
 
       if (!dbError && dbData && dbData.length > 0) {
         const latest = dbData[0];

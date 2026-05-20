@@ -42,17 +42,38 @@ export async function updateSession(request: NextRequest) {
 
   const isLoginPage = request.nextUrl.pathname.startsWith('/login')
   const isAdminPage = request.nextUrl.pathname.startsWith('/admin')
+  const isPortariaPage = request.nextUrl.pathname.startsWith('/portaria')
 
-  if (isAdminPage && !user) {
+  if ((isAdminPage || isPortariaPage) && !user) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
   }
 
-  if (isLoginPage && user) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/admin'
-    return NextResponse.redirect(url)
+  if (user) {
+    const role = user.app_metadata?.role || user.user_metadata?.role || '';
+    const email = user.email || '';
+    
+    const isAuthAdmin = ['dono', 'gerente', 'admin'].includes(role) || email === 'narnia@admin.com';
+    const isReceptionist = ['receptionist', 'portaria'].includes(role);
+
+    if (isAdminPage && !isAuthAdmin) {
+      const url = request.nextUrl.clone()
+      url.pathname = isReceptionist ? '/portaria' : '/login'
+      return NextResponse.redirect(url)
+    }
+
+    if (isPortariaPage && !isAuthAdmin && !isReceptionist) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/login'
+      return NextResponse.redirect(url)
+    }
+
+    if (isLoginPage) {
+      const url = request.nextUrl.clone()
+      url.pathname = isAuthAdmin ? '/admin' : (isReceptionist ? '/portaria' : '/')
+      return NextResponse.redirect(url)
+    }
   }
 
   return supabaseResponse

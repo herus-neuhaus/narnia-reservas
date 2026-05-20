@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createClient as createAdminClient } from '@supabase/supabase-js';
+import { createClient } from '@/lib/supabase/server';
 
 export const dynamic = 'force-dynamic';
 
@@ -7,7 +8,31 @@ export async function POST(req: NextRequest) {
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL!;
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // 1. Validar autenticação do usuário logado
+    const supabase = await createClient();
+    
+    let token: string | undefined;
+    const authHeader = req.headers.get('Authorization');
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.substring(7);
+    }
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+
+    if (authError || !user) {
+      console.error('[API Events Create] Auth Error:', authError);
+      return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 });
+    }
+
+    const userRole = user.app_metadata?.role || user.user_metadata?.role || '';
+    const isAuthAdmin = ['dono', 'gerente', 'admin'].includes(userRole) || user.email === 'narnia@admin.com';
+
+    if (!isAuthAdmin) {
+      return NextResponse.json({ error: 'Permissão insuficiente.' }, { status: 403 });
+    }
+
+    const supabaseAdmin = createAdminClient(supabaseUrl, supabaseServiceKey);
 
     const body = await req.json();
     const { title, date, description, start_time, list_limit_capacity, list_limit_time, banner_url, visible_from } = body;
@@ -19,7 +44,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from('events')
       .insert([
         {

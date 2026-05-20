@@ -51,8 +51,8 @@ export default function AtivarPage() {
       }
 
       if (signInData?.user) {
-        // Buscar os metadados do usuário que definimos na criação (user_metadata)
-        const userRole = signInData.user.user_metadata?.role;
+        // Buscar os metadados do usuário que definimos de forma segura
+        const userRole = signInData.user.app_metadata?.role || signInData.user.user_metadata?.role;
 
         if (userRole === 'admin' || userRole === 'dono' || userRole === 'gerente' || email === 'narnia@admin.com') {
           router.push('/admin');

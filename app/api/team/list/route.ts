@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createClient as createAdminClient } from '@supabase/supabase-js';
+import { createClient } from '@/lib/supabase/server';
 
 // Otimização Vercel: Garante que a requisição sempre bata no banco e nunca em cache estático
 export const dynamic = 'force-dynamic';
@@ -17,12 +18,47 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // Instanciação segura dentro do escopo da requisição
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+    // 1. Validar autenticação do usuário logado
+    const supabase = await createClient();
+    
+    let token: string | undefined;
+    const authHeader = req.headers.get('Authorization');
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.substring(7);
+    }
+
+    const { data: { user }, error: authError } = token 
+      ? await supabase.auth.getUser(token) 
+      : await supabase.auth.getUser();
+
+    if (authError || !user) {
+      console.log('[API Team List] Erro de autenticação ou usuário não encontrado.');
+      console.log('[API Team List] Auth error:', authError);
+      console.log('[API Team List] User data:', user);
+      console.log('[API Team List] Token:', token ? `Bearer ${token.substring(0, 10)}...` : 'Nenhum token nos headers de autorização');
+      return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 });
+    }
+
+    const userRole = user.app_metadata?.role || user.user_metadata?.role || '';
+    const emailClaim = user.email || '';
+    
+    const isAuthAdmin = ['dono', 'gerente', 'admin'].includes(userRole) || emailClaim === 'narnia@admin.com';
+
+    if (!isAuthAdmin) {
+      console.log('[API Team List] Permissão insuficiente.');
+      console.log('[API Team List] User ID:', user.id);
+      console.log('[API Team List] User Email:', emailClaim);
+      console.log('[API Team List] User Role (app_metadata):', user.app_metadata?.role);
+      console.log('[API Team List] User Role (user_metadata):', user.user_metadata?.role);
+      return NextResponse.json({ error: 'Permissão insuficiente.' }, { status: 403 });
+    }
 
     const { searchParams } = new URL(req.url);
     const role = searchParams.get('role');
     const email = searchParams.get('email');
+
+    // Instanciação segura do admin client para execução da query
+    const supabaseAdmin = createAdminClient(supabaseUrl, supabaseServiceKey);
 
     let query = supabaseAdmin.from('team_members').select('*');
     
