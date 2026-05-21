@@ -79,6 +79,7 @@ export default function PortariaDashboard() {
           isBlacklisted={isBlacklisted}
           isReceptionist={isReceptionist}
           onCheckInClick={handleCheckInClick}
+          onPhotoClick={(res) => setProfilePhotoModalData(res)}
         />
 
         {/* Counters */}

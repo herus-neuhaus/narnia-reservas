@@ -10,13 +10,15 @@ interface PortariaSearchResultProps {
   isBlacklisted: any | null;
   isReceptionist: boolean;
   onCheckInClick: (id: string, currentStatus: string | null) => void;
+  onPhotoClick: (reservation: any) => void;
 }
 
 export default function PortariaSearchResult({
   searchResult,
   isBlacklisted,
   isReceptionist,
-  onCheckInClick
+  onCheckInClick,
+  onPhotoClick
 }: PortariaSearchResultProps) {
   if (!searchResult && !isBlacklisted) return null;
 
@@ -44,13 +46,17 @@ export default function PortariaSearchResult({
         <div className="bg-[#D4AF37] text-black rounded-[32px] p-8 shadow-2xl animate-in slide-in-from-top-4">
           <div className="flex flex-col sm:flex-row justify-between items-center gap-6">
             <div className="flex items-center gap-6">
-              <div className="w-20 h-20 bg-black/10 rounded-[28px] flex items-center justify-center overflow-hidden border border-black/10 shadow-inner">
+              <button 
+                onClick={() => onPhotoClick(searchResult)}
+                className="w-20 h-20 bg-black/10 rounded-[28px] flex items-center justify-center overflow-hidden border border-black/10 shadow-inner hover:scale-105 transition-all hover:border-black/30"
+                title="Atualizar Foto"
+              >
                 {searchResult.photo ? (
                   <img src={searchResult.photo} alt={searchResult.name} className="w-full h-full object-cover" />
                 ) : (
                   <UserCheck size={40} />
                 )}
-              </div>
+              </button>
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-widest opacity-60">Reserva Encontrada</p>
                 <h2 className="text-3xl font-bold tracking-tight">{searchResult.name}</h2>

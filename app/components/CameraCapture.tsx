@@ -111,7 +111,7 @@ export default function CameraCapture({ onPhotoCaptured, initialPhoto = null }: 
   return (
     <div className="flex flex-col items-center gap-3 w-full">
       <div className="relative w-40 h-40 rounded-3xl overflow-hidden border-2 border-white/10 bg-black/60 flex items-center justify-center shadow-inner group">
-        {photo ? (
+        {photo && !isCameraActive ? (
           <>
             <img src={photo} alt="Foto do Cliente" className="w-full h-full object-cover" />
             <button
