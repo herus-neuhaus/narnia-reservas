@@ -11,6 +11,7 @@ interface PortariaListProps {
   isReceptionist: boolean;
   onQuickAddClick: () => void;
   onCheckInClick: (id: string, currentStatus: string | null) => void;
+  onPhotoClick: (reservation: any) => void;
 }
 
 export default function PortariaList({
@@ -19,7 +20,8 @@ export default function PortariaList({
   filteredReservations,
   isReceptionist,
   onQuickAddClick,
-  onCheckInClick
+  onCheckInClick,
+  onPhotoClick
 }: PortariaListProps) {
   return (
     <div className="bg-[#0A0A0A] rounded-[40px] border border-white/10 overflow-hidden shadow-2xl">
@@ -48,7 +50,11 @@ export default function PortariaList({
           filteredReservations.map((res) => (
             <div key={res.id} className="p-5 flex items-center justify-between hover:bg-white/[0.02] transition-all group">
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-2xl overflow-hidden flex items-center justify-center border border-white/10 text-white/40 shadow-inner">
+                <button 
+                  onClick={() => onPhotoClick(res)}
+                  className="w-12 h-12 rounded-2xl overflow-hidden flex items-center justify-center border border-white/10 text-white/40 shadow-inner hover:scale-105 transition-all hover:border-[#D4AF37]/50"
+                  title="Atualizar Foto"
+                >
                   {res.photo ? (
                     <img src={res.photo} alt={res.name} className="w-full h-full object-cover" />
                   ) : (
@@ -56,7 +62,7 @@ export default function PortariaList({
                       {res.type === 'lista' ? <UserPlus size={20} /> : res.type === 'pulseira' ? <Ticket size={20} /> : <CalendarDays size={20} />}
                     </div>
                   )}
-                </div>
+                </button>
                 <div>
                   <h4 className="font-bold text-sm leading-tight">{res.name}</h4>
                   <div className="flex gap-3 mt-1 items-center">

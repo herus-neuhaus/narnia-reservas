@@ -12,12 +12,14 @@ import PortariaHeader from './components/PortariaHeader';
 import PortariaCounters from './components/PortariaCounters';
 import PortariaSearchResult from './components/PortariaSearchResult';
 import PortariaList from './components/PortariaList';
-import PhotoCaptureModal from './components/PhotoCaptureModal';
+import CheckInPhotoModal from './components/PhotoCaptureModal'; // Renamed import to avoid collision
+import ProfilePhotoModal from '@/app/components/PhotoCaptureModal'; // The new modal for updating profile photo
 import { usePortariaCheckIn } from '@/hooks/usePortariaCheckIn';
 import { useRouter } from 'next/navigation';
 
 export default function PortariaDashboard() {
   const router = useRouter();
+  const [profilePhotoModalData, setProfilePhotoModalData] = React.useState<any>(null);
   const {
     loading,
     searchTerm,
@@ -95,6 +97,7 @@ export default function PortariaDashboard() {
           isReceptionist={isReceptionist}
           onQuickAddClick={() => setShowQuickAdd(true)}
           onCheckInClick={handleCheckInClick}
+          onPhotoClick={(res) => setProfilePhotoModalData(res)}
         />
 
       </main>
@@ -109,8 +112,7 @@ export default function PortariaDashboard() {
         reservations={reservations}
       />
 
-      {/* Photo Capture Modal for Check-in */}
-      <PhotoCaptureModal
+      <CheckInPhotoModal
         isOpen={!!photoCaptureModalData}
         onClose={() => {
           setPhotoCaptureModalData(null);
@@ -125,6 +127,21 @@ export default function PortariaDashboard() {
         }}
         capturedPhoto={capturedPhoto}
         setCapturedPhoto={setCapturedPhoto}
+      />
+
+      {/* Photo Update Modal from List */}
+      <ProfilePhotoModal
+        isOpen={!!profilePhotoModalData}
+        onClose={() => setProfilePhotoModalData(null)}
+        customerId={profilePhotoModalData?.customer_id}
+        customerName={profilePhotoModalData?.name}
+        initialPhoto={profilePhotoModalData?.photo}
+        onSuccess={(newPhoto) => {
+          // This will re-fetch data or update the local state optimistically
+          setProfilePhotoModalData(null);
+          // Let's force a reload to get the new data
+          window.location.reload();
+        }}
       />
 
       {/* Blacklist Alert Modal */}
