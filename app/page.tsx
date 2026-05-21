@@ -112,10 +112,12 @@ export default function NarniaClubPortal() {
     available: !reservedLocations.includes(`M${i + 1}`)
   }));
 
+  const allowedCamarotes = selectedEvent?.available_camarotes || ['C1', 'C2', 'C3'];
+
   const cabinElements = [
-    { id: 'C1', type: 'camarote' as const, label: 'C1', available: !reservedLocations.includes('C1') },
-    { id: 'C2', type: 'camarote' as const, label: 'C2', available: !reservedLocations.includes('C2') },
-    { id: 'C3', type: 'camarote' as const, label: 'C3', available: !reservedLocations.includes('C3') },
+    { id: 'C1', type: 'camarote' as const, label: 'C1', available: allowedCamarotes.includes('C1') && !reservedLocations.includes('C1') },
+    { id: 'C2', type: 'camarote' as const, label: 'C2', available: allowedCamarotes.includes('C2') && !reservedLocations.includes('C2') },
+    { id: 'C3', type: 'camarote' as const, label: 'C3', available: allowedCamarotes.includes('C3') && !reservedLocations.includes('C3') },
   ];
 
   const renderReservationFlow = () => (

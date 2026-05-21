@@ -12,6 +12,7 @@ type EventRow = Database['public']['Tables']['events']['Row'] & {
   start_time?: string | null;
   banner_url?: string | null;
   visible_from?: string | null;
+  available_camarotes?: string[] | null;
 };
 
 export default function EventsManager() {
@@ -46,6 +47,7 @@ export default function EventsManager() {
     list_limit_capacity: '',
     visible_from: '',
     banner_url: '',
+    available_camarotes: ['C1', 'C2', 'C3'],
     image_file: null as File | null
   });
 
@@ -124,7 +126,8 @@ export default function EventsManager() {
           list_limit_capacity: formData.list_limit_capacity || '0',
           list_limit_time: formData.list_limit_time || '23:30',
           banner_url: formData.banner_url,
-          visible_from: formData.visible_from ? new Date(formData.visible_from).toISOString() : null
+          visible_from: formData.visible_from ? new Date(formData.visible_from).toISOString() : null,
+          available_camarotes: formData.available_camarotes
         })
       });
 
@@ -143,6 +146,7 @@ export default function EventsManager() {
         list_limit_capacity: '', 
         visible_from: '',
         banner_url: '', 
+        available_camarotes: ['C1', 'C2', 'C3'],
         image_file: null 
       });
       fetchEvents();
@@ -314,6 +318,29 @@ export default function EventsManager() {
               rows={4}
               className="w-full px-6 py-4 bg-[#0d0d0d] border border-zinc-800 rounded-2xl outline-none focus:border-[#d4af37] focus:ring-1 focus:ring-[#d4af37] transition-all text-white resize-none font-medium"
             />
+          </div>
+
+          <div>
+            <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400 ml-4 mb-1 block">Camarotes Disponíveis</label>
+            <div className="flex gap-4 px-4">
+              {['C1', 'C2', 'C3'].map(camarote => (
+                <label key={camarote} className="flex items-center gap-2 text-white font-medium cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.available_camarotes.includes(camarote)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setFormData(prev => ({ ...prev, available_camarotes: [...prev.available_camarotes, camarote] }));
+                      } else {
+                        setFormData(prev => ({ ...prev, available_camarotes: prev.available_camarotes.filter(c => c !== camarote) }));
+                      }
+                    }}
+                    className="w-4 h-4 rounded border-zinc-800 bg-[#0d0d0d] checked:bg-[#d4af37] checked:border-[#d4af37] focus:ring-[#d4af37] transition-all"
+                  />
+                  {camarote}
+                </label>
+              ))}
+            </div>
           </div>
 
           <div>
