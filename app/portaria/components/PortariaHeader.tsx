@@ -9,9 +9,11 @@ interface PortariaHeaderProps {
   isAdmin: boolean;
   onAdminClick: () => void;
   onLogout: () => void;
+  selectedDate?: string;
+  setSelectedDate?: (date: string) => void;
 }
 
-export default function PortariaHeader({ isAdmin, onAdminClick, onLogout }: PortariaHeaderProps) {
+export default function PortariaHeader({ isAdmin, onAdminClick, onLogout, selectedDate, setSelectedDate }: PortariaHeaderProps) {
   return (
     <header className="sticky top-0 z-30 bg-black/80 backdrop-blur-md p-4 lg:px-8 border-b border-[#D4AF37]/20 shadow-xl">
       <div className="flex justify-between items-center max-w-5xl mx-auto">
@@ -25,10 +27,17 @@ export default function PortariaHeader({ isAdmin, onAdminClick, onLogout }: Port
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <div className="hidden sm:block text-right mr-2">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-white/40 leading-none mb-1">Data de Hoje</p>
-            <p className="text-xs font-bold">{format(startOfToday(), "dd 'de' MMMM", { locale: ptBR })}</p>
-          </div>
+          {selectedDate && setSelectedDate && (
+            <div className="hidden sm:block text-right mr-2">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-white/40 leading-none mb-1">Data Visualizada</p>
+              <input 
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="bg-transparent border-none text-xs font-bold text-white focus:outline-none cursor-pointer [&::-webkit-calendar-picker-indicator]:filter [&::-webkit-calendar-picker-indicator]:invert"
+              />
+            </div>
+          )}
           {isAdmin && (
             <button 
               onClick={onAdminClick}

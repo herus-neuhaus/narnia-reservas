@@ -58,6 +58,12 @@ function AdminDashboardContent() {
   } = useAdminDashboard();
 
   const datePickerRef = useRef<HTMLDivElement>(null);
+  const [typeFilter, setTypeFilter] = React.useState('all');
+
+  const displayedReservations = filteredReservations.filter(res => {
+    if (typeFilter === 'all') return true;
+    return res.type === typeFilter;
+  });
 
   return (
     <AdminLayoutShell activeItem={currentView}>
@@ -170,6 +176,24 @@ function AdminDashboardContent() {
               <StatCard icon={ClipboardList} label="Nome na Lista" value={filteredReservations.filter(r => r.type === 'lista').length} color="#D4AF37" />
             </div>
 
+            {/* Type Filters */}
+            <div className="flex items-center gap-2 mb-2 overflow-x-auto pb-2 custom-scrollbar">
+              {['Todos', 'Lista', 'Camarote', 'Mesa', 'Pulseira'].map((t) => {
+                const id = t === 'Todos' ? 'all' : t.toLowerCase();
+                return (
+                  <button
+                    key={id}
+                    onClick={() => setTypeFilter(id)}
+                    className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                      typeFilter === id ? 'bg-[#D4AF37] text-black shadow-[0_0_15px_rgba(212,175,55,0.3)]' : 'bg-[#0A0A0A] border border-white/5 text-white/40 hover:bg-white/5 hover:text-white'
+                    }`}
+                  >
+                    {t}
+                  </button>
+                )
+              })}
+            </div>
+
             {/* Desktop Table View */}
             <div className="hidden md:block bg-[#0A0A0A] rounded-[32px] border border-white/5 shadow-2xl overflow-x-auto custom-scrollbar">
               {loading ? (
@@ -177,7 +201,7 @@ function AdminDashboardContent() {
                   <Loader2 className="w-10 h-10 animate-spin mb-4" />
                   <p className="text-xs font-bold uppercase tracking-widest">Carregando Reservas...</p>
                 </div>
-              ) : filteredReservations.length === 0 ? (
+              ) : displayedReservations.length === 0 ? (
                 <div className="p-20 text-center opacity-30">
                   <p className="text-sm font-bold">Nenhuma reserva encontrada para este período.</p>
                 </div>
@@ -193,7 +217,7 @@ function AdminDashboardContent() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5">
-                    {filteredReservations.map((res) => (
+                    {displayedReservations.map((res) => (
                       <tr key={res.id} className="hover:bg-white/[0.02] transition-colors group">
                         <td className="px-6 py-5">
                           <div className="flex flex-col">
@@ -253,7 +277,7 @@ function AdminDashboardContent() {
 
             {/* Mobile Cards View */}
             <div className="block md:hidden space-y-4">
-              {filteredReservations.map((res) => (
+              {displayedReservations.map((res) => (
                 <div 
                   key={res.id} 
                   className={`bg-[#0A0A0A] border rounded-[24px] p-5 space-y-4 transition-all ${

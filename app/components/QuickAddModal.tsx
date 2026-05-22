@@ -15,6 +15,7 @@ interface QuickAddModalProps {
   onDuplicate: (duplicateInfo: any) => void;
   blacklist: any[];
   reservations: any[];
+  selectedDate: string;
 }
 
 export default function QuickAddModal({
@@ -24,7 +25,8 @@ export default function QuickAddModal({
   onBlocked,
   onDuplicate,
   blacklist,
-  reservations
+  reservations,
+  selectedDate
 }: QuickAddModalProps) {
   const [isAdding, setIsAdding] = useState(false);
   const [isCpfLoading, setIsCpfLoading] = useState(false);
@@ -94,7 +96,7 @@ export default function QuickAddModal({
     }
 
     setIsAdding(true);
-    const today = format(new Date(), 'yyyy-MM-dd');
+    const today = selectedDate;
 
     const getPortoVelhoTime = () => {
       const now = new Date();

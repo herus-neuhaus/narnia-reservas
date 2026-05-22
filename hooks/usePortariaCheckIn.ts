@@ -25,6 +25,7 @@ export function usePortariaCheckIn() {
   const [blacklist, setBlacklist] = useState<Blacklist[]>([]);
   const [searchResult, setSearchResult] = useState<Reservation | null>(null);
   const [isBlacklisted, setIsBlacklisted] = useState<Blacklist | null>(null);
+  const [typeFilter, setTypeFilter] = useState<string>('all');
   
   // Modal & Alert states
   const [showQuickAdd, setShowQuickAdd] = useState(false);
@@ -37,8 +38,8 @@ export function usePortariaCheckIn() {
 
   const supabase = createClient();
   const router = useRouter();
-  const today = format(startOfToday(), 'yyyy-MM-dd');
-  const todayBrl = format(startOfToday(), 'dd/MM/yyyy');
+  const [selectedDate, setSelectedDate] = useState<string>(format(startOfToday(), 'yyyy-MM-dd'));
+  const todayBrl = selectedDate.split('-').reverse().join('/');
 
   const { showAlert, alertProps } = useCustomAlert();
 
@@ -57,7 +58,7 @@ export function usePortariaCheckIn() {
       setIsAdmin(['dono', 'gerente', 'admin'].includes(role) || email === 'narnia@admin.com');
       setIsReceptionist(role === 'receptionist');
 
-      const mappedResData = await fetchTodaysReservations(today);
+      const mappedResData = await fetchTodaysReservations(selectedDate);
       const blData = await fetchBlacklistEntries();
 
       setReservations(mappedResData);
@@ -71,10 +72,9 @@ export function usePortariaCheckIn() {
   };
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchTodaysData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [selectedDate]);
 
   const handleSearch = (term: string) => {
     setSearchTerm(term);
@@ -243,6 +243,8 @@ export function usePortariaCheckIn() {
   };
 
   const filteredReservations = reservations.filter(r => {
+    if (typeFilter !== 'all' && r.type !== typeFilter) return false;
+    
     if (!searchTerm) return true;
     const normTerm = normalize(searchTerm);
     return (
@@ -305,6 +307,10 @@ export function usePortariaCheckIn() {
     showAlert,
     alertProps,
     fetchTodaysData,
-    updateCustomerPhotoLocally
+    updateCustomerPhotoLocally,
+    selectedDate,
+    setSelectedDate,
+    typeFilter,
+    setTypeFilter
   };
 }

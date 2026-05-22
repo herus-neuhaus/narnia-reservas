@@ -48,7 +48,11 @@ export default function PortariaDashboard() {
     handleLogout,
     alertProps,
     fetchTodaysData,
-    updateCustomerPhotoLocally
+    updateCustomerPhotoLocally,
+    selectedDate,
+    setSelectedDate,
+    typeFilter,
+    setTypeFilter
   } = usePortariaCheckIn();
 
   return (
@@ -57,6 +61,8 @@ export default function PortariaDashboard() {
         isAdmin={isAdmin}
         onAdminClick={() => router.push('/admin')}
         onLogout={handleLogout}
+        selectedDate={selectedDate}
+        setSelectedDate={setSelectedDate}
       />
 
       <main className="p-4 lg:p-8 max-w-5xl mx-auto space-y-6 pb-24">
@@ -92,6 +98,26 @@ export default function PortariaDashboard() {
           totalGuests={reservations.reduce((acc, curr) => acc + (curr.num_guests || 1), 0)}
         />
 
+        {/* Type Filters */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-2 custom-scrollbar">
+          {['Todos', 'Lista', 'Camarote', 'Mesa', 'Pulseira'].map((t) => {
+            const id = t === 'Todos' ? 'all' : t.toLowerCase();
+            return (
+              <button
+                key={id}
+                onClick={() => setTypeFilter(id)}
+                className={`px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap flex-shrink-0 ${
+                  typeFilter === id 
+                    ? 'bg-[#D4AF37] text-black shadow-[0_0_15px_rgba(212,175,55,0.3)]' 
+                    : 'bg-[#0A0A0A] border-2 border-white/5 text-white/40 hover:bg-white/5 hover:text-white hover:border-white/10'
+                }`}
+              >
+                {t}
+              </button>
+            )
+          })}
+        </div>
+
         {/* Consolidated List */}
         <PortariaList
           todayBrl={todayBrl}
@@ -113,6 +139,7 @@ export default function PortariaDashboard() {
         onDuplicate={setDuplicateAlert}
         blacklist={blacklist}
         reservations={reservations}
+        selectedDate={selectedDate}
       />
 
       <CheckInPhotoModal
