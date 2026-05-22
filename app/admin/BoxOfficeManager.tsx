@@ -8,12 +8,15 @@ import {
   createTicketBatch, 
   updateTicketBatch, 
   activateTicketBatch,
+  deleteTicketBatch,
   closeBoxOffice, 
   fetchBoxOfficeReport 
 } from '@/src/services/ticketing';
 import { 
   fetchComplimentaryTickets, 
-  updateComplimentaryStatus 
+  updateComplimentaryStatus,
+  deleteComplimentaryTicket,
+  updateComplimentaryNotes
 } from '@/src/services/complimentary';
 import { 
   fetchCamarotesWithOccupation, 
@@ -139,22 +142,60 @@ export default function BoxOfficeManager() {
 
 function BatchesTab({ batches, eventDate, onReload }: any) {
   const [isCreating, setIsCreating] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
   const [quantity, setQuantity] = useState('');
   const [order, setOrder] = useState('1');
 
-  const handleCreate = async () => {
+  const resetForm = () => {
+    setIsCreating(false);
+    setEditingId(null);
+    setName('');
+    setPrice('');
+    setQuantity('');
+    setOrder('1');
+  };
+
+  const handleEdit = (b: any) => {
+    setEditingId(b.id);
+    setName(b.name);
+    setPrice(b.price.toString());
+    setQuantity(b.total_quantity.toString());
+    setOrder(b.batch_order.toString());
+    setIsCreating(true);
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Tem certeza que deseja apagar este lote?')) return;
     try {
-      await createTicketBatch({
-        event_date: eventDate,
-        name,
-        price: Number(price),
-        total_quantity: Number(quantity),
-        batch_order: Number(order),
-        status: 'draft'
-      });
-      setIsCreating(false);
+      await deleteTicketBatch(id);
+      onReload();
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
+  const handleSave = async () => {
+    try {
+      if (editingId) {
+        await updateTicketBatch(editingId, {
+          name,
+          price: Number(price),
+          total_quantity: Number(quantity),
+          batch_order: Number(order)
+        });
+      } else {
+        await createTicketBatch({
+          event_date: eventDate,
+          name,
+          price: Number(price),
+          total_quantity: Number(quantity),
+          batch_order: Number(order),
+          status: 'draft'
+        });
+      }
+      resetForm();
       onReload();
     } catch (err: any) {
       alert(err.message);
@@ -183,14 +224,14 @@ function BatchesTab({ batches, eventDate, onReload }: any) {
     <div className="space-y-8 animate-in fade-in">
       <div className="flex justify-between items-center">
         <h3 className="text-xl font-bold">Gestão de Lotes</h3>
-        <button onClick={() => setIsCreating(!isCreating)} className="bg-[#D4AF37] text-black px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest">
+        <button onClick={() => isCreating ? resetForm() : setIsCreating(true)} className="bg-[#D4AF37] text-black px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest">
           {isCreating ? 'Cancelar' : '+ Novo Lote'}
         </button>
       </div>
 
       {isCreating && (
-        <div className="bg-white/5 p-6 rounded-2xl border border-white/10 flex gap-4 items-end">
-          <div className="flex-1">
+        <div className="bg-white/5 p-6 rounded-2xl border border-white/10 flex flex-wrap md:flex-nowrap gap-4 items-end">
+          <div className="flex-1 min-w-[200px]">
             <label className="text-[10px] uppercase text-white/40 font-bold mb-1 block">Nome do Lote</label>
             <input type="text" placeholder="Ex: Lote 1" value={name} onChange={e => setName(e.target.value)} className="w-full bg-black border border-white/10 rounded-xl px-4 py-2 text-sm" />
           </div>
@@ -206,7 +247,7 @@ function BatchesTab({ batches, eventDate, onReload }: any) {
             <label className="text-[10px] uppercase text-white/40 font-bold mb-1 block">Quantidade</label>
             <input type="number" placeholder="100" value={quantity} onChange={e => setQuantity(e.target.value)} className="w-full bg-black border border-white/10 rounded-xl px-4 py-2 text-sm" />
           </div>
-          <button onClick={handleCreate} className="bg-green-500 text-black px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest h-[38px]">
+          <button onClick={handleSave} className="bg-green-500 text-black px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest h-[38px]">
             Salvar
           </button>
         </div>
@@ -235,17 +276,23 @@ function BatchesTab({ batches, eventDate, onReload }: any) {
               <p className="text-[10px] uppercase text-white/40 font-bold mb-1">Arrecadado</p>
               <p className="text-2xl font-black text-green-500">R$ {(b.consumed_quantity * b.price).toFixed(2)}</p>
               
-              <div className="flex gap-2 mt-3">
+              <div className="flex gap-2 mt-3 flex-wrap justify-end">
                 {b.status !== 'active' && (
                   <button onClick={() => handleActivate(b.id)} className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all">
                     Ativar Lote
                   </button>
                 )}
                 {b.status === 'active' && (
-                  <button onClick={() => handleUpdateStatus(b.id, 'exhausted')} className="px-4 py-2 bg-red-500/20 text-red-500 hover:bg-red-500 hover:text-white rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all">
+                  <button onClick={() => handleUpdateStatus(b.id, 'exhausted')} className="px-4 py-2 bg-yellow-500/20 text-yellow-500 hover:bg-yellow-500 hover:text-white rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all">
                     Marcar Esgotado
                   </button>
                 )}
+                <button onClick={() => handleEdit(b)} className="px-4 py-2 bg-blue-500/20 text-blue-500 hover:bg-blue-500 hover:text-white rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all">
+                  Editar
+                </button>
+                <button onClick={() => handleDelete(b.id)} className="px-4 py-2 bg-red-500/20 text-red-500 hover:bg-red-500 hover:text-white rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all">
+                  Apagar
+                </button>
               </div>
             </div>
           </div>
@@ -266,6 +313,27 @@ function ComplimentaryTab({ complimentary, adminId, onReload }: any) {
     }
   };
 
+  const handleEditNotes = async (id: string, currentNotes: string) => {
+    const newNotes = prompt('Editar observação da cortesia:', currentNotes || '');
+    if (newNotes === null) return;
+    try {
+      await updateComplimentaryNotes(id, newNotes);
+      onReload();
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Tem certeza que deseja apagar esta cortesia do histórico?')) return;
+    try {
+      await deleteComplimentaryTicket(id);
+      onReload();
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
   const pending = complimentary.filter((c: any) => c.status === 'pending');
   const resolved = complimentary.filter((c: any) => c.status !== 'pending');
 
@@ -276,12 +344,23 @@ function ComplimentaryTab({ complimentary, adminId, onReload }: any) {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {pending.map((c: any) => (
             <div key={c.id} className="p-5 bg-yellow-500/5 border border-yellow-500/20 rounded-2xl">
-              <p className="font-bold text-sm">{c.customers?.name}</p>
+              <div className="flex justify-between items-start mb-1">
+                <p className="font-bold text-sm">{c.customers?.name}</p>
+                <div className="flex gap-2">
+                  <button onClick={() => handleEditNotes(c.id, c.notes)} title="Editar Observação" className="text-blue-400 hover:text-blue-300">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                  </button>
+                  <button onClick={() => handleDelete(c.id)} title="Apagar" className="text-red-400 hover:text-red-300">
+                    <XCircle size={14} />
+                  </button>
+                </div>
+              </div>
               <p className="text-[10px] text-white/50 uppercase mb-2">CPF: {c.customers?.cpf}</p>
               <p className="text-xs text-white/70 italic mb-4">Sol. por: {c.requested_by_user?.name}</p>
+              {c.notes && <p className="text-xs bg-black/50 p-2 rounded mb-4">Obs: {c.notes}</p>}
               <div className="flex gap-2">
-                <button onClick={() => handleUpdate(c.id, 'approved')} className="flex-1 py-2 bg-green-500/20 text-green-500 hover:bg-green-500 hover:text-black rounded-lg text-[10px] font-bold uppercase tracking-widest">Aprovar</button>
-                <button onClick={() => handleUpdate(c.id, 'rejected')} className="flex-1 py-2 bg-red-500/20 text-red-500 hover:bg-red-500 hover:text-white rounded-lg text-[10px] font-bold uppercase tracking-widest">Reprovar</button>
+                <button onClick={() => handleUpdate(c.id, 'approved')} className="flex-1 py-2 bg-green-500/20 text-green-500 hover:bg-green-500 hover:text-black rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all">Aprovar</button>
+                <button onClick={() => handleUpdate(c.id, 'rejected')} className="flex-1 py-2 bg-red-500/20 text-red-500 hover:bg-red-500 hover:text-white rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all">Reprovar</button>
               </div>
             </div>
           ))}
@@ -293,14 +372,19 @@ function ComplimentaryTab({ complimentary, adminId, onReload }: any) {
         <h3 className="text-xl font-bold mb-4">Histórico</h3>
         <div className="space-y-2">
           {resolved.map((c: any) => (
-            <div key={c.id} className="flex justify-between items-center p-3 bg-white/5 rounded-xl border border-white/5">
+            <div key={c.id} className="flex justify-between items-center p-3 bg-white/5 rounded-xl border border-white/5 group">
               <div>
                 <p className="text-xs font-bold">{c.customers?.name} <span className="text-white/30 font-normal">({c.customers?.cpf})</span></p>
                 <p className="text-[9px] text-white/40 uppercase mt-0.5">Resp: {c.approved_by_user?.name}</p>
               </div>
-              <span className={`px-2 py-1 rounded-lg text-[9px] font-black uppercase ${c.status === 'approved' ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
-                {c.status === 'approved' ? 'Aprovada' : 'Reprovada'}
-              </span>
+              <div className="flex items-center gap-4">
+                <button onClick={() => handleDelete(c.id)} className="opacity-0 group-hover:opacity-100 p-1 text-red-500 hover:bg-red-500/20 rounded transition-all">
+                  <XCircle size={14} />
+                </button>
+                <span className={`px-2 py-1 rounded-lg text-[9px] font-black uppercase ${c.status === 'approved' ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
+                  {c.status === 'approved' ? 'Aprovada' : 'Reprovada'}
+                </span>
+              </div>
             </div>
           ))}
         </div>

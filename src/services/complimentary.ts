@@ -74,3 +74,21 @@ export async function updateComplimentaryStatus(ticketId: string, status: 'appro
     throw new Error(`Erro ao ${actionName} cortesia: ${parsed.message}`);
   }
 }
+
+export async function deleteComplimentaryTicket(ticketId: string) {
+  const { error } = await supabase
+    .from('complimentary_tickets')
+    .delete()
+    .eq('id', ticketId);
+
+  if (error) throw new Error(`Erro ao excluir cortesia: ${error.message}`);
+}
+
+export async function updateComplimentaryNotes(ticketId: string, notes: string) {
+  const { error } = await supabase
+    .from('complimentary_tickets')
+    .update({ notes })
+    .eq('id', ticketId);
+
+  if (error) throw new Error(`Erro ao atualizar cortesia: ${error.message}`);
+}

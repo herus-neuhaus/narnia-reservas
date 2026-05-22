@@ -18,6 +18,7 @@ interface QuickAddModalProps {
   reservations: any[];
   camarotes?: any[];
   selectedDate: string;
+  event?: any;
 }
 
 export default function QuickAddModal({
@@ -29,7 +30,8 @@ export default function QuickAddModal({
   blacklist,
   reservations,
   camarotes = [],
-  selectedDate
+  selectedDate,
+  event
 }: QuickAddModalProps) {
   const [isAdding, setIsAdding] = useState(false);
   const [isCpfLoading, setIsCpfLoading] = useState(false);
@@ -44,6 +46,45 @@ export default function QuickAddModal({
   });
 
   const supabase = createClient();
+
+  const getPortoVelhoTime = () => {
+    const now = new Date();
+    const formatter = new Intl.DateTimeFormat('pt-BR', {
+      timeZone: 'America/Porto_Velho',
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit',
+      hour12: false
+    });
+    
+    const parts = formatter.formatToParts(now);
+    const getValue = (type: string) => parts.find(p => p.type === type)?.value || '';
+    return `${getValue('year')}-${getValue('month')}-${getValue('day')} ${getValue('hour')}:${getValue('minute')}:${getValue('second')}`;
+  };
+
+  const isCortesiaExpired = () => {
+    if (!event || !event.list_limit_time) return false;
+    
+    const currentPvTime = getPortoVelhoTime();
+    const [currentDate, currentTime] = currentPvTime.split(' ');
+    const limitTime = event.list_limit_time;
+    
+    const [limitH] = limitTime.split(':').map(Number);
+    const limitDayOffset = limitH < 12 ? 1 : 0;
+    
+    const buildAbsolute = (dateStr: string, timeStr: string, dayOffset: number) => {
+       const d = new Date(dateStr + 'T12:00:00Z');
+       d.setDate(d.getDate() + dayOffset);
+       const yyyy = d.getFullYear();
+       const mm = String(d.getMonth() + 1).padStart(2, '0');
+       const dd = String(d.getDate()).padStart(2, '0');
+       return `${yyyy}${mm}${dd}${timeStr.replace(/:/g, '')}`;
+    };
+    
+    const currentAbs = currentDate.replace(/-/g, '') + currentTime.replace(/:/g, '');
+    const limitAbs = buildAbsolute(selectedDate, limitTime, limitDayOffset);
+    
+    return currentAbs > limitAbs;
+  };
 
   useEffect(() => {
     if (isOpen) {
@@ -141,24 +182,6 @@ export default function QuickAddModal({
 
     setIsAdding(true);
     const today = selectedDate;
-
-    const getPortoVelhoTime = () => {
-      const now = new Date();
-      const formatter = new Intl.DateTimeFormat('pt-BR', {
-        timeZone: 'America/Porto_Velho',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: false
-      });
-      
-      const parts = formatter.formatToParts(now);
-      const getValue = (type: string) => parts.find(p => p.type === type)?.value || '';
-      return `${getValue('year')}-${getValue('month')}-${getValue('day')} ${getValue('hour')}:${getValue('minute')}:${getValue('second')}`;
-    };
 
     // 1. Upsert do cliente na tabela customers
     let customerId: string | null = null;
@@ -483,21 +506,35 @@ export default function QuickAddModal({
 
           <div>
             <label className="text-[10px] font-bold uppercase tracking-widest text-white/30 ml-4 mb-1 block">Tipo de Acesso</label>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               {[
+                { id: 'lista', label: 'Cortesia', disabled: isCortesiaExpired() },
                 { id: 'camarote', label: 'VIP' },
                 { id: 'pulseira', label: 'Pulseira' }
               ].map((t) => (
                 <button
                   key={t.id}
                   type="button"
+                  disabled={t.disabled}
                   onClick={() => setQuickFormData({ ...quickFormData, type: t.id as any, location_id: '' })}
-                  className={`py-3 sm:py-4 rounded-xl text-xs font-bold uppercase border transition-all ${quickFormData.type === t.id ? 'bg-[#D4AF37] border-[#D4AF37] text-black shadow-lg shadow-[#D4AF37]/10' : 'bg-black border-white/10 text-white/40 hover:text-white/60'}`}
+                  className={`py-3 sm:py-4 rounded-xl text-xs font-bold uppercase border transition-all ${
+                    t.disabled 
+                      ? 'bg-red-500/10 border-red-500/30 text-red-500/50 cursor-not-allowed' 
+                      : quickFormData.type === t.id 
+                        ? 'bg-[#D4AF37] border-[#D4AF37] text-black shadow-lg shadow-[#D4AF37]/10' 
+                        : 'bg-black border-white/10 text-white/40 hover:text-white/60 hover:bg-white/5'
+                  }`}
+                  title={t.disabled ? `Horário de cortesia encerrou (${event?.list_limit_time})` : ''}
                 >
                   {t.label}
                 </button>
               ))}
             </div>
+            {isCortesiaExpired() && (
+              <p className="text-[10px] text-red-500/80 mt-2 ml-4 italic">
+                O horário de cortesia ({event?.list_limit_time}) já encerrou. Utilize Pulseira.
+              </p>
+            )}
           </div>
 
           {(quickFormData.type === 'mesa' || quickFormData.type === 'camarote') && (

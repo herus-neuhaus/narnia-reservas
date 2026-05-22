@@ -50,6 +50,15 @@ export async function updateTicketBatch(id: string, updates: TicketBatchUpdate) 
   return data;
 }
 
+export async function deleteTicketBatch(id: string) {
+  const { error } = await supabase
+    .from('ticket_batches')
+    .delete()
+    .eq('id', id);
+
+  if (error) throw new Error(`Erro ao excluir lote: ${error.message}`);
+}
+
 
 
 /**

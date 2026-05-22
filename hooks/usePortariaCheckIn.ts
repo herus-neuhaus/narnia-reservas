@@ -35,6 +35,7 @@ export function usePortariaCheckIn() {
   const [ticketBatches, setTicketBatches] = useState<any[]>([]);
   const [complimentaryTickets, setComplimentaryTickets] = useState<any[]>([]);
   const [camarotes, setCamarotes] = useState<any[]>([]);
+  const [event, setEvent] = useState<any>(null);
   
   // Modal & Alert states
   const [showQuickAdd, setShowQuickAdd] = useState(false);
@@ -80,6 +81,14 @@ export function usePortariaCheckIn() {
       setComplimentaryTickets(compl);
       const cams = await fetchCamarotesWithOccupation(selectedDate);
       setCamarotes(cams);
+
+      // Fetch event
+      const { data: evData } = await supabase.from('events').select('*').eq('event_date', selectedDate).maybeSingle();
+      if (evData) {
+        setEvent(evData);
+      } else {
+        setEvent(null);
+      }
     } catch (err: any) {
       console.error('Error fetching today\'s portaria data:', err);
       showAlert('Erro de Conexão', 'Não foi possível sincronizar os dados da portaria.', 'error');
@@ -380,6 +389,7 @@ export function usePortariaCheckIn() {
     requestComplimentaryTicket: async (params: any) => { const res = await requestComplimentaryTicket(params); fetchTodaysData(true); return res; },
     updateComplimentaryStatus: async (id: string, status: 'approved' | 'rejected') => { const res = await updateComplimentaryStatus(id, status); fetchTodaysData(true); return res; },
     registerCamaroteEntry: async (params: any) => { const res = await registerCamaroteEntry(params); fetchTodaysData(true); return res; },
-    registerExtraCamaroteEntry: async (params: any) => { const res = await registerExtraCamaroteEntry(params); fetchTodaysData(true); return res; }
+    registerExtraCamaroteEntry: async (params: any) => { const res = await registerExtraCamaroteEntry(params); fetchTodaysData(true); return res; },
+    event
   };
 }

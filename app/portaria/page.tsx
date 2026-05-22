@@ -68,7 +68,8 @@ export default function PortariaDashboard() {
     requestComplimentaryTicket,
     updateComplimentaryStatus,
     registerCamaroteEntry,
-    registerExtraCamaroteEntry
+    registerExtraCamaroteEntry,
+    event
   } = usePortariaCheckIn();
 
   const stats = getFilteredStats();
@@ -193,6 +194,7 @@ export default function PortariaDashboard() {
         reservations={reservations}
         camarotes={camarotes}
         selectedDate={selectedDate}
+        event={event}
       />
 
       <CheckInPhotoModal
