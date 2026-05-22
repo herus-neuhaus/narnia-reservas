@@ -17,7 +17,7 @@ import {
   Loader2,
   ShieldAlert
 } from 'lucide-react';
-import { differenceInDays, parseISO, differenceInYears } from 'date-fns';
+import { differenceInDays, parseISO, differenceInYears, parse } from 'date-fns';
 import { formatToBrlDateTime } from '@/lib/utils';
 import EventPicker from './components/EventPicker';
 import SVGMap from './components/SVGMap';
@@ -82,6 +82,28 @@ export default function NarniaClubPortal() {
   const listLimitTime = selectedEvent?.list_limit_time 
     ? selectedEvent.list_limit_time.substring(0, 5) 
     : '23:30';
+
+  const formatBirthDate = (value: string) => {
+    const v = value.replace(/\D/g, '').slice(0, 8);
+    if (v.length >= 5) {
+      return `${v.slice(0, 2)}/${v.slice(2, 4)}/${v.slice(4)}`;
+    } else if (v.length >= 3) {
+      return `${v.slice(0, 2)}/${v.slice(2)}`;
+    }
+    return v;
+  };
+
+  const toIsoDate = (brDate: string) => {
+    if (!brDate || brDate.length !== 10) return brDate;
+    const [d, m, y] = brDate.split('/');
+    return `${y}-${m}-${d}`;
+  };
+
+  const toBrDate = (isoDate: string) => {
+    if (!isoDate || !isoDate.includes('-')) return isoDate;
+    const [y, m, d] = isoDate.split('-');
+    return `${d}/${m}/${y}`;
+  };
 
   const renderStepHeader = (num: number, Icon: any, title: string, val: any) => {
     const isPast = activeStep > num;
@@ -259,7 +281,7 @@ export default function NarniaClubPortal() {
                         ...prev,
                         name: customer.name || prev.name,
                         whatsapp: customer.whatsapp || prev.whatsapp,
-                        birth_date: customer.birth_date || prev.birth_date,
+                        birth_date: customer.birth_date ? toBrDate(customer.birth_date) : prev.birth_date,
                         email: customer.email || prev.email
                       }));
                     });
@@ -284,9 +306,10 @@ export default function NarniaClubPortal() {
             <div className="space-y-1 relative">
               <p className="text-xs font-bold uppercase tracking-widest text-[#D4AF37] ml-4 mb-1">Data de Nascimento</p>
               <input 
-                type="date" 
+                type="tel" 
                 value={formData.birth_date} 
-                onChange={e => setFormData({...formData, birth_date: e.target.value})}
+                onChange={e => setFormData({...formData, birth_date: formatBirthDate(e.target.value)})}
+                placeholder="DD/MM/AAAA"
                 className={`w-full px-6 py-4 bg-black border rounded-2xl outline-none text-base text-white transition-all ${formErrors.birth_date ? 'border-red-500' : 'border-white/10 focus:border-[#D4AF37]'}`}
               />
               {formErrors.birth_date && <p className="text-xs text-red-500 ml-4">{formErrors.birth_date}</p>}
@@ -312,10 +335,10 @@ export default function NarniaClubPortal() {
                 } else if (!cpfValidator.isValid(formData.cpf)) {
                   errors.cpf = 'CPF inválido';
                 }
-                if (!formData.birth_date) {
-                  errors.birth_date = 'Data de nascimento é obrigatória';
+                if (!formData.birth_date || formData.birth_date.length !== 10) {
+                  errors.birth_date = 'Data de nascimento inválida';
                 } else {
-                  const age = differenceInYears(new Date(), parseISO(formData.birth_date));
+                  const age = differenceInYears(new Date(), parse(formData.birth_date, 'dd/MM/yyyy', new Date()));
                   if (age < 18) {
                     errors.birth_date = 'Apenas maiores de 18 anos podem reservar';
                   }

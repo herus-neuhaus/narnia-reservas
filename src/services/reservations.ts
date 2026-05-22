@@ -166,3 +166,24 @@ export async function fetchCustomerPhoto(customerId: string) {
   if (error) throw error;
   return data?.photo || null;
 }
+
+export async function registerBraceletEntry(params: {
+  cpf: string;
+  name: string;
+  whatsapp: string;
+  birthDate: string;
+  photo: string | null;
+  eventDate: string;
+}) {
+  const { data, error } = await supabase.rpc('create_bracelet_entry_v2', {
+    p_cpf: params.cpf,
+    p_name: params.name,
+    p_whatsapp: params.whatsapp,
+    p_birth_date: params.birthDate,
+    p_photo: params.photo || '',
+    p_event_date: params.eventDate
+  });
+
+  if (error) throw error;
+  return typeof data === 'string' ? JSON.parse(data) : data;
+}

@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { XCircle, Loader2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
-import { format, parseISO, differenceInYears } from 'date-fns';
+import { format, parseISO, differenceInYears, parse } from 'date-fns';
 import { cpf } from 'cpf-cnpj-validator';
 import CameraCapture from './CameraCapture';
+import { registerBraceletEntry } from '@/src/services/reservations';
 
 interface QuickAddModalProps {
   isOpen: boolean;
@@ -15,6 +16,7 @@ interface QuickAddModalProps {
   onDuplicate: (duplicateInfo: any) => void;
   blacklist: any[];
   reservations: any[];
+  camarotes?: any[];
   selectedDate: string;
 }
 
@@ -26,6 +28,7 @@ export default function QuickAddModal({
   onDuplicate,
   blacklist,
   reservations,
+  camarotes = [],
   selectedDate
 }: QuickAddModalProps) {
   const [isAdding, setIsAdding] = useState(false);
@@ -41,6 +44,22 @@ export default function QuickAddModal({
   });
 
   const supabase = createClient();
+
+  useEffect(() => {
+    if (isOpen) {
+      setQuickFormData({ 
+        name: '', 
+        cpf: '', 
+        birth_date: '',
+        whatsapp: '', 
+        type: 'pulseira', 
+        location_id: '',
+        photo: null
+      });
+      setIsAdding(false);
+      setIsCpfLoading(false);
+    }
+  }, [isOpen]);
 
   const formatCPF = (value: string) => {
     return value
@@ -58,6 +77,28 @@ export default function QuickAddModal({
     return `(${raw.substring(0, 2)}) ${raw.substring(2, 7)}-${raw.substring(7, 11)}`;
   };
 
+  const formatBirthDate = (value: string) => {
+    const v = value.replace(/\D/g, '').slice(0, 8);
+    if (v.length >= 5) {
+      return `${v.slice(0, 2)}/${v.slice(2, 4)}/${v.slice(4)}`;
+    } else if (v.length >= 3) {
+      return `${v.slice(0, 2)}/${v.slice(2)}`;
+    }
+    return v;
+  };
+
+  const toIsoDate = (brDate: string) => {
+    if (!brDate || brDate.length !== 10) return brDate;
+    const [d, m, y] = brDate.split('/');
+    return `${y}-${m}-${d}`;
+  };
+
+  const toBrDate = (isoDate: string) => {
+    if (!isoDate || !isoDate.includes('-')) return isoDate;
+    const [y, m, d] = isoDate.split('-');
+    return `${d}/${m}/${y}`;
+  };
+
   const handleQuickAdd = async () => {
     if (!quickFormData.name || !quickFormData.cpf) {
       alert('Nome e CPF são obrigatórios.');
@@ -69,12 +110,12 @@ export default function QuickAddModal({
       return;
     }
 
-    if (!quickFormData.birth_date) {
-      alert('Data de nascimento é obrigatória.');
+    if (!quickFormData.birth_date || quickFormData.birth_date.length !== 10) {
+      alert('Data de nascimento inválida (use o formato DD/MM/AAAA).');
       return;
     }
 
-    const age = differenceInYears(new Date(), parseISO(quickFormData.birth_date));
+    const age = differenceInYears(new Date(), parse(quickFormData.birth_date, 'dd/MM/yyyy', new Date()));
     if (age < 18) {
       alert('Entrada/Reserva bloqueada: O Nárnia Club permite o acesso apenas para maiores de 18 anos.');
       return;
@@ -132,7 +173,7 @@ export default function QuickAddModal({
           .update({
             name: quickFormData.name,
             whatsapp: quickFormData.whatsapp,
-            birth_date: quickFormData.birth_date,
+            birth_date: toIsoDate(quickFormData.birth_date),
             photo: quickFormData.photo || customer.photo
           })
           .eq('id', customerId);
@@ -143,7 +184,7 @@ export default function QuickAddModal({
             cpf: quickFormData.cpf,
             name: quickFormData.name,
             whatsapp: quickFormData.whatsapp,
-            birth_date: quickFormData.birth_date,
+            birth_date: toIsoDate(quickFormData.birth_date),
             email: `portaria_${quickFormData.cpf.replace(/\D/g, '')}@narnia.com`,
             photo: quickFormData.photo
           }])
@@ -160,7 +201,96 @@ export default function QuickAddModal({
       return;
     }
 
-    // 2. Inserção da reserva vinculada
+    if (quickFormData.type === 'pulseira') {
+      try {
+        const braceletRes = await registerBraceletEntry({
+          cpf: quickFormData.cpf,
+          name: quickFormData.name,
+          whatsapp: quickFormData.whatsapp,
+          birthDate: toIsoDate(quickFormData.birth_date),
+          photo: quickFormData.photo,
+          eventDate: selectedDate
+        });
+        
+        if (braceletRes?.success) {
+          onSuccess({
+            name: quickFormData.name,
+            cpf: quickFormData.cpf,
+            whatsapp: quickFormData.whatsapp,
+            type: 'pulseira',
+            check_in_status: 'entered',
+            entered_at: getPortoVelhoTime(),
+            reservation_date: selectedDate,
+            reservation_time: format(new Date(), 'HH:mm'),
+            photo: quickFormData.photo
+          });
+          setQuickFormData({ name: '', cpf: '', birth_date: '', whatsapp: '', type: 'pulseira', location_id: '', photo: null });
+          onClose();
+        } else {
+          alert('Erro ao registrar pulseira: ' + (braceletRes?.message || 'Desconhecido'));
+        }
+      } catch (err: any) {
+        alert('Erro ao registrar pulseira: ' + err.message);
+      }
+      setIsAdding(false);
+      return;
+    }
+
+    if (quickFormData.type === 'camarote') {
+      const selectedCamarote = camarotes.find(c => c.name === quickFormData.location_id);
+      if (!selectedCamarote) {
+        alert('Selecione um camarote válido.');
+        setIsAdding(false);
+        return;
+      }
+
+      const { data, error } = await supabase.rpc('register_camarote_guest_entry', {
+        p_camarote_id: selectedCamarote.id,
+        p_cpf: quickFormData.cpf.replace(/\D/g, ''),
+        p_name: quickFormData.name,
+        p_whatsapp: quickFormData.whatsapp,
+        p_birth_date: toIsoDate(quickFormData.birth_date)
+      });
+
+      if (error) {
+        const isDuplicate = error.code === '23505' || error.message?.includes('já registrado') || error.message?.includes('duplicate');
+        if (isDuplicate) {
+          onDuplicate({
+            name: quickFormData.name,
+            cpf: quickFormData.cpf,
+            type: 'camarote',
+            reservation_date: today,
+            reservation_time: format(new Date(), 'HH:mm'),
+            check_in_status: 'entered'
+          });
+        } else if (error.message?.includes('FULL') || error.message?.includes('lotado')) {
+          alert('Camarote lotado! Apenas o admin/gerente pode autorizar a entrada como EXTRA.');
+        } else {
+          alert('Erro ao registrar entrada no camarote: ' + error.message);
+        }
+      } else if (data && data.success) {
+        onSuccess({
+          name: quickFormData.name,
+          cpf: quickFormData.cpf,
+          whatsapp: quickFormData.whatsapp,
+          type: 'camarote',
+          location_id: selectedCamarote.name,
+          check_in_status: 'entered',
+          entered_at: getPortoVelhoTime(),
+          reservation_date: selectedDate,
+          reservation_time: format(new Date(), 'HH:mm'),
+          photo: quickFormData.photo
+        });
+        setQuickFormData({ name: '', cpf: '', birth_date: '', whatsapp: '', type: 'pulseira', location_id: '', photo: null });
+        onClose();
+      } else {
+        alert('Erro ao registrar entrada no camarote: ' + (data?.message || 'Erro desconhecido.'));
+      }
+      setIsAdding(false);
+      return;
+    }
+
+    // 2. Inserção da reserva vinculada para outros tipos (Legacy)
     const { data, error } = await supabase
       .from('reservations')
       .insert([{
@@ -169,12 +299,12 @@ export default function QuickAddModal({
         name: quickFormData.name,
         email: `portaria_${quickFormData.cpf.replace(/\D/g, '')}@narnia.com`,
         cpf: quickFormData.cpf,
-        birth_date: quickFormData.birth_date,
+        birth_date: toIsoDate(quickFormData.birth_date),
         whatsapp: quickFormData.whatsapp,
         reservation_date: today,
         reservation_time: format(new Date(), 'HH:mm'),
         type: quickFormData.type,
-        location_id: (quickFormData.type === 'mesa' || quickFormData.type === 'camarote') ? quickFormData.location_id : null,
+        location_id: quickFormData.type === 'mesa' ? quickFormData.location_id : null,
         check_in_status: 'entered',
         entered_at: getPortoVelhoTime(),
         num_guests: 1,
@@ -270,7 +400,7 @@ export default function QuickAddModal({
                           ...prev,
                           name: data.name || prev.name,
                           whatsapp: data.whatsapp || prev.whatsapp,
-                          birth_date: data.birth_date || prev.birth_date || '',
+                          birth_date: data.birth_date ? toBrDate(data.birth_date) : prev.birth_date || '',
                           photo: data.photo || prev.photo
                         }));
                       } else {
@@ -295,7 +425,7 @@ export default function QuickAddModal({
                                 ...prev,
                                 name: latest.name || prev.name,
                                 whatsapp: latest.whatsapp || prev.whatsapp,
-                                birth_date: latest.birth_date || prev.birth_date || '',
+                                birth_date: latest.birth_date ? toBrDate(latest.birth_date) : prev.birth_date || '',
                                 photo: photoUrlOrBase64 || prev.photo
                               }));
                             }
@@ -328,11 +458,12 @@ export default function QuickAddModal({
           <div className="relative">
             <label className="text-[10px] font-bold uppercase tracking-widest text-white/30 ml-4 mb-1 block">Data de Nascimento</label>
             <input 
-              type="date" 
+              type="tel" 
               value={isCpfLoading ? "" : quickFormData.birth_date}
               disabled={isCpfLoading}
-              onChange={(e) => setQuickFormData({...quickFormData, birth_date: e.target.value})}
+              onChange={(e) => setQuickFormData({...quickFormData, birth_date: formatBirthDate(e.target.value)})}
               className={`w-full px-5 py-3 sm:px-6 sm:py-4 bg-black border border-white/10 rounded-2xl focus:border-[#D4AF37] outline-none text-white font-medium ${isCpfLoading ? 'opacity-50 animate-pulse border-[#D4AF37]/50 pointer-events-none' : ''}`}
+              placeholder={isCpfLoading ? "Aguarde..." : "DD/MM/AAAA"}
             />
           </div>
           <div className="relative">
@@ -369,30 +500,52 @@ export default function QuickAddModal({
           {(quickFormData.type === 'mesa' || quickFormData.type === 'camarote') && (
             <div className="animate-in fade-in slide-in-from-top-2">
               <label className="text-[10px] font-bold uppercase tracking-widest text-white/30 ml-4 mb-1 block">
-                {quickFormData.type === 'mesa' ? 'Selecionar Mesa Livre' : 'Selecionar Camarote Livre'}
+                {quickFormData.type === 'mesa' ? 'Selecionar Mesa Livre' : 'Selecionar Camarote Existente'}
               </label>
               <div className="grid grid-cols-4 gap-2">
-                {(quickFormData.type === 'mesa' 
-                  ? Array.from({ length: 12 }, (_, i) => `M${i + 1}`) 
-                  : ['C1', 'C2', 'C3']
-                ).map((loc) => {
-                  const isOccupied = reservations.some(r => r.location_id === loc);
-                  return (
-                    <button
-                      key={loc}
-                      type="button"
-                      disabled={isOccupied}
-                      onClick={() => setQuickFormData({ ...quickFormData, location_id: loc })}
-                      className={`py-2 rounded-lg text-xs font-bold transition-all border ${
-                        isOccupied ? 'bg-red-500/20 border-red-500/20 text-red-500/40 cursor-not-allowed' :
-                        quickFormData.location_id === loc ? 'bg-[#D4AF37] border-[#D4AF37] text-black scale-105' : 
-                        'bg-white/5 border-white/10 text-white/60 hover:border-[#D4AF37]/40'
-                      }`}
-                    >
-                      {loc}
-                    </button>
-                  );
-                })}
+                {quickFormData.type === 'camarote' ? (
+                  camarotes.length === 0 ? (
+                    <div className="col-span-4 text-center py-2 text-white/30 text-xs">Nenhum camarote reservado hoje.</div>
+                  ) : (
+                    camarotes.map((camarote) => {
+                      const isFull = (camarote.camarote_entries?.find((e: any) => e.is_extra === false)?.count || 0) >= camarote.capacity;
+                      return (
+                        <button
+                          key={camarote.id}
+                          type="button"
+                          disabled={isFull}
+                          onClick={() => setQuickFormData({ ...quickFormData, location_id: camarote.name })}
+                          className={`py-2 rounded-lg text-xs font-bold transition-all border ${
+                            isFull ? 'bg-red-500/20 border-red-500/20 text-red-500/40 cursor-not-allowed' :
+                            quickFormData.location_id === camarote.name ? 'bg-[#D4AF37] border-[#D4AF37] text-black shadow-lg' : 
+                            'bg-white/5 border-white/10 text-white/60 hover:border-[#D4AF37]/40'
+                          }`}
+                        >
+                          {camarote.name}
+                        </button>
+                      );
+                    })
+                  )
+                ) : (
+                  Array.from({ length: 12 }, (_, i) => `M${i + 1}`).map((loc) => {
+                    const isOccupied = reservations.some(r => r.location_id === loc);
+                    return (
+                      <button
+                        key={loc}
+                        type="button"
+                        disabled={isOccupied}
+                        onClick={() => setQuickFormData({ ...quickFormData, location_id: loc })}
+                        className={`py-2 rounded-lg text-xs font-bold transition-all border ${
+                          isOccupied ? 'bg-red-500/20 border-red-500/20 text-red-500/40 cursor-not-allowed' :
+                          quickFormData.location_id === loc ? 'bg-[#D4AF37] border-[#D4AF37] text-black shadow-lg' : 
+                          'bg-white/5 border-white/10 text-white/60 hover:border-[#D4AF37]/40'
+                        }`}
+                      >
+                        {loc}
+                      </button>
+                    );
+                  })
+                )}
               </div>
             </div>
           )}

@@ -12,8 +12,12 @@ import PortariaHeader from './components/PortariaHeader';
 import PortariaCounters from './components/PortariaCounters';
 import PortariaSearchResult from './components/PortariaSearchResult';
 import PortariaList from './components/PortariaList';
-import CheckInPhotoModal from './components/PhotoCaptureModal'; // Renamed import to avoid collision
-import ProfilePhotoModal from '@/app/components/PhotoCaptureModal'; // The new modal for updating profile photo
+import TimeFilter from './components/TimeFilter';
+import TicketingWidget from './components/TicketingWidget';
+import ComplimentaryWidget from './components/ComplimentaryWidget';
+import CamaroteWidget from './components/CamaroteWidget';
+import CheckInPhotoModal from './components/PhotoCaptureModal';
+import ProfilePhotoModal from '@/app/components/PhotoCaptureModal';
 import { usePortariaCheckIn } from '@/hooks/usePortariaCheckIn';
 import { useRouter } from 'next/navigation';
 
@@ -41,6 +45,14 @@ export default function PortariaDashboard() {
     setCapturedPhoto,
     todayBrl,
     filteredReservations,
+    getFilteredStats,
+    ticketBatches,
+    complimentaryTickets,
+    camarotes,
+    startTime,
+    setStartTime,
+    endTime,
+    setEndTime,
     handleSearch,
     handleCheckInClick,
     toggleCheckInWithPhoto,
@@ -52,8 +64,14 @@ export default function PortariaDashboard() {
     selectedDate,
     setSelectedDate,
     typeFilter,
-    setTypeFilter
+    setTypeFilter,
+    requestComplimentaryTicket,
+    updateComplimentaryStatus,
+    registerCamaroteEntry,
+    registerExtraCamaroteEntry
   } = usePortariaCheckIn();
+
+  const stats = getFilteredStats();
 
   return (
     <div className="min-h-screen bg-black font-sans text-white">
@@ -90,12 +108,19 @@ export default function PortariaDashboard() {
           onPhotoClick={(res) => setProfilePhotoModalData(res)}
         />
 
-        {/* Counters */}
         <PortariaCounters
-          totalList={reservations.filter(r => r.type === 'lista').length}
-          totalTablesCamarotes={reservations.filter(r => r.type !== 'lista').length}
-          enteredCount={reservations.filter(r => r.check_in_status === 'entered').length}
-          totalGuests={reservations.reduce((acc, curr) => acc + (curr.num_guests || 1), 0)}
+          total={stats.total}
+          enteredCount={stats.enteredCount}
+          enteredInTimeRange={stats.enteredInTimeRange}
+          hasTimeFilter={stats.hasTimeFilter}
+          typeFilter={typeFilter}
+        />
+
+        <TimeFilter 
+          startTime={startTime}
+          setStartTime={setStartTime}
+          endTime={endTime}
+          setEndTime={setEndTime}
         />
 
         {/* Type Filters */}
@@ -118,16 +143,43 @@ export default function PortariaDashboard() {
           })}
         </div>
 
-        {/* Consolidated List */}
-        <PortariaList
-          todayBrl={todayBrl}
-          loading={loading}
-          filteredReservations={filteredReservations}
-          isReceptionist={isReceptionist}
-          onQuickAddClick={() => setShowQuickAdd(true)}
-          onCheckInClick={handleCheckInClick}
-          onPhotoClick={(res) => setProfilePhotoModalData(res)}
-        />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2">
+            <PortariaList
+              todayBrl={todayBrl}
+              loading={loading}
+              filteredReservations={filteredReservations}
+              isReceptionist={isReceptionist}
+              onQuickAddClick={() => setShowQuickAdd(true)}
+              onCheckInClick={handleCheckInClick}
+              onPhotoClick={(res) => setProfilePhotoModalData(res)}
+            />
+          </div>
+          
+          <div className="space-y-6">
+            <TicketingWidget 
+              batches={ticketBatches} 
+              onOpenQuickAdd={() => {
+                setTypeFilter('pulseira');
+                setShowQuickAdd(true);
+              }} 
+            />
+            
+            <CamaroteWidget 
+              camarotes={camarotes}
+              isAdmin={isAdmin}
+              onRegisterEntry={registerCamaroteEntry}
+              onRegisterExtra={registerExtraCamaroteEntry}
+            />
+
+            <ComplimentaryWidget 
+              complimentaryTickets={complimentaryTickets}
+              isAdmin={isAdmin}
+              onRequest={(cpf, name, notes) => requestComplimentaryTicket({ cpf, name, whatsapp: '', birthDate: '', notes, eventDate: selectedDate })}
+              onUpdateStatus={(id, status) => updateComplimentaryStatus(id, status)}
+            />
+          </div>
+        </div>
 
       </main>
 
@@ -139,6 +191,7 @@ export default function PortariaDashboard() {
         onDuplicate={setDuplicateAlert}
         blacklist={blacklist}
         reservations={reservations}
+        camarotes={camarotes}
         selectedDate={selectedDate}
       />
 

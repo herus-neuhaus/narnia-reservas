@@ -20,8 +20,8 @@ export function useAdminDashboard() {
   const searchParams = useSearchParams();
   const viewParam = searchParams.get('view') || 'reservations';
   
-  const currentView = ['reservations', 'blacklist', 'events', 'clientes', 'administradores', 'recepcionistas'].includes(viewParam)
-    ? (viewParam as 'reservations' | 'blacklist' | 'events' | 'clientes' | 'administradores' | 'recepcionistas')
+  const currentView = ['reservations', 'blacklist', 'events', 'clientes', 'administradores', 'recepcionistas', 'bilheteria'].includes(viewParam)
+    ? (viewParam as 'reservations' | 'blacklist' | 'events' | 'clientes' | 'administradores' | 'recepcionistas' | 'bilheteria')
     : 'reservations';
 
   const [reservations, setReservations] = useState<Reservation[]>([]);

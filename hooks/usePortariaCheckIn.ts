@@ -9,6 +9,9 @@ import {
   getReservationsByCpfRpc 
 } from '@/src/services/reservations';
 import { fetchBlacklistEntries } from '@/src/services/blacklist';
+import { fetchTicketBatches } from '@/src/services/ticketing';
+import { requestComplimentaryTicket, fetchComplimentaryTickets, updateComplimentaryStatus } from '@/src/services/complimentary';
+import { fetchCamarotesWithOccupation, registerCamaroteEntry, registerExtraCamaroteEntry } from '@/src/services/camarotes';
 import { useCustomAlert } from './use-custom-alert';
 
 export type Reservation = any;
@@ -26,6 +29,12 @@ export function usePortariaCheckIn() {
   const [searchResult, setSearchResult] = useState<Reservation | null>(null);
   const [isBlacklisted, setIsBlacklisted] = useState<Blacklist | null>(null);
   const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [startTime, setStartTime] = useState<string>('');
+  const [endTime, setEndTime] = useState<string>('');
+
+  const [ticketBatches, setTicketBatches] = useState<any[]>([]);
+  const [complimentaryTickets, setComplimentaryTickets] = useState<any[]>([]);
+  const [camarotes, setCamarotes] = useState<any[]>([]);
   
   // Modal & Alert states
   const [showQuickAdd, setShowQuickAdd] = useState(false);
@@ -43,8 +52,8 @@ export function usePortariaCheckIn() {
 
   const { showAlert, alertProps } = useCustomAlert();
 
-  const fetchTodaysData = async () => {
-    setLoading(true);
+  const fetchTodaysData = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
@@ -63,15 +72,39 @@ export function usePortariaCheckIn() {
 
       setReservations(mappedResData);
       setBlacklist(blData);
+
+      // Advanced Ticketing Data
+      const batches = await fetchTicketBatches(selectedDate);
+      setTicketBatches(batches);
+      const compl = await fetchComplimentaryTickets(selectedDate);
+      setComplimentaryTickets(compl);
+      const cams = await fetchCamarotesWithOccupation(selectedDate);
+      setCamarotes(cams);
     } catch (err: any) {
       console.error('Error fetching today\'s portaria data:', err);
       showAlert('Erro de Conexão', 'Não foi possível sincronizar os dados da portaria.', 'error');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
   useEffect(() => {
+    const channel = supabase.channel('portaria-sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'reservations' }, () => fetchTodaysData(true))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'complimentary_tickets' }, () => fetchTodaysData(true))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'camarote_entries' }, () => fetchTodaysData(true))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ticket_batches' }, () => fetchTodaysData(true))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'box_office_reports' }, () => fetchTodaysData(true))
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDate]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchTodaysData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDate]);
@@ -221,6 +254,7 @@ export function usePortariaCheckIn() {
   const onQuickAddSuccess = (newRes: Reservation) => {
     const mappedRes = {
       ...newRes,
+      id: newRes.id || `temp_${Date.now()}_${Math.random()}`,
       name: newRes.name,
       cpf: newRes.cpf,
       whatsapp: newRes.whatsapp,
@@ -242,9 +276,23 @@ export function usePortariaCheckIn() {
     router.push('/login');
   };
 
+  const checkTimeRange = (enteredAt: string | null) => {
+    if (!enteredAt) return false;
+    const d = new Date(enteredAt);
+    const timeStr = d.toLocaleTimeString('pt-BR', { timeZone: 'America/Porto_Velho', hour: '2-digit', minute: '2-digit' });
+    if (startTime && timeStr < startTime) return false;
+    if (endTime && timeStr > endTime) return false;
+    return true;
+  };
+
   const filteredReservations = reservations.filter(r => {
     if (typeFilter !== 'all' && r.type !== typeFilter) return false;
     
+    if (startTime || endTime) {
+      if (r.check_in_status !== 'entered') return false;
+      if (!checkTimeRange(r.entered_at)) return false;
+    }
+
     if (!searchTerm) return true;
     const normTerm = normalize(searchTerm);
     return (
@@ -253,6 +301,15 @@ export function usePortariaCheckIn() {
       r.whatsapp?.includes(searchTerm)
     );
   });
+
+  const getFilteredStats = () => {
+    const baseType = reservations.filter(r => typeFilter === 'all' || r.type === typeFilter);
+    const total = baseType.length;
+    const entered = baseType.filter(r => r.check_in_status === 'entered');
+    const enteredCount = entered.length;
+    const enteredInTimeRange = (startTime || endTime) ? entered.filter(r => checkTimeRange(r.entered_at)).length : enteredCount;
+    return { total, enteredCount, enteredInTimeRange, hasTimeFilter: !!(startTime || endTime) };
+  };
 
   const updateCustomerPhotoLocally = (customerId: string, photoBase64: string) => {
     setReservations(prev => prev.map(r => {
@@ -299,6 +356,14 @@ export function usePortariaCheckIn() {
     setCapturedPhoto,
     todayBrl,
     filteredReservations,
+    getFilteredStats,
+    ticketBatches,
+    complimentaryTickets,
+    camarotes,
+    startTime,
+    setStartTime,
+    endTime,
+    setEndTime,
     handleSearch,
     handleCheckInClick,
     toggleCheckInWithPhoto,
@@ -311,6 +376,10 @@ export function usePortariaCheckIn() {
     selectedDate,
     setSelectedDate,
     typeFilter,
-    setTypeFilter
+    setTypeFilter,
+    requestComplimentaryTicket: async (params: any) => { const res = await requestComplimentaryTicket(params); fetchTodaysData(true); return res; },
+    updateComplimentaryStatus: async (id: string, status: 'approved' | 'rejected') => { const res = await updateComplimentaryStatus(id, status); fetchTodaysData(true); return res; },
+    registerCamaroteEntry: async (params: any) => { const res = await registerCamaroteEntry(params); fetchTodaysData(true); return res; },
+    registerExtraCamaroteEntry: async (params: any) => { const res = await registerExtraCamaroteEntry(params); fetchTodaysData(true); return res; }
   };
 }

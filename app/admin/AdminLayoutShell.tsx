@@ -12,7 +12,8 @@ import {
   ShieldCheck,
   UserCheck,
   Menu,
-  X
+  X,
+  Ticket
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
@@ -153,6 +154,14 @@ export default function AdminLayoutShell({ children, activeItem }: { children: R
             className={`w-full min-h-[44px] flex items-center gap-4 px-6 py-3 rounded-2xl font-bold uppercase tracking-widest text-xs transition-all ${activeItem === 'clientes' ? 'bg-[#D4AF37] text-black shadow-[0_0_20px_rgba(212,175,55,0.2)]' : 'text-white/40 hover:bg-white/5'}`}
           >
             <Users size={18} /> Clientes
+          </Link>
+
+          <Link 
+            href="/admin?view=bilheteria"
+            onClick={() => setIsMenuOpen(false)}
+            className={`w-full min-h-[44px] flex items-center gap-4 px-6 py-3 rounded-2xl font-bold uppercase tracking-widest text-xs transition-all ${activeItem === 'bilheteria' ? 'bg-[#D4AF37] text-black shadow-[0_0_20px_rgba(212,175,55,0.2)]' : 'text-white/40 hover:bg-white/5'}`}
+          >
+            <Ticket size={18} /> Bilheteria
           </Link>
 
           <Link 

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { format, startOfToday, parseISO, differenceInYears } from 'date-fns';
+import { format, startOfToday, parseISO, differenceInYears, parse } from 'date-fns';
 import { cpf as cpfValidator } from 'cpf-cnpj-validator';
 import { 
   createReservationAtomic, 
@@ -154,10 +154,10 @@ export function useReservation() {
       errors.cpf = 'CPF inválido';
     }
 
-    if (!formData.birth_date) {
-      errors.birth_date = 'Data de nascimento é obrigatória';
+    if (!formData.birth_date || formData.birth_date.length !== 10) {
+      errors.birth_date = 'Data de nascimento inválida';
     } else {
-      const age = differenceInYears(new Date(), parseISO(formData.birth_date));
+      const age = differenceInYears(new Date(), parse(formData.birth_date, 'dd/MM/yyyy', new Date()));
       if (age < 18) {
         errors.birth_date = 'Apenas maiores de 18 anos podem reservar';
         showAlert('Acesso Restrito', 'O Nárnia Club permite a entrada apenas para pessoas com 18 anos ou mais.', 'error');
@@ -198,12 +198,18 @@ export function useReservation() {
     }
 
     try {
+      const toIsoDate = (brDate: string) => {
+        if (!brDate || brDate.length !== 10) return brDate;
+        const [d, m, y] = brDate.split('/');
+        return `${y}-${m}-${d}`;
+      };
+
       const res = await createReservationAtomic({
         cpf: formData.cpf.replace(/\D/g, ''),
         name: formData.name,
         email: formData.email,
         whatsapp: formData.whatsapp,
-        birthDate: formData.birth_date,
+        birthDate: toIsoDate(formData.birth_date),
         date: date || format(new Date(), 'yyyy-MM-dd'),
         time: time || '22:00',
         guests: guests || 1,
