@@ -267,7 +267,7 @@ export function usePortariaCheckIn() {
     }));
 
     if (searchResult?.customer_id === customerId) {
-      setSearchResult(prev => {
+      setSearchResult((prev: any) => {
         if (!prev) return prev;
         return {
           ...prev,
