@@ -28,13 +28,13 @@ export default function PortariaHeader({ isAdmin, onAdminClick, onLogout, select
         </div>
         <div className="flex items-center gap-3">
           {selectedDate && setSelectedDate && (
-            <div className="hidden sm:block text-right mr-2">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-white/40 leading-none mb-1">Data Visualizada</p>
+            <div className="flex flex-col items-end mr-1 sm:mr-2">
+              <p className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-white/40 leading-none mb-1">Data</p>
               <input 
                 type="date"
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
-                className="bg-transparent border-none text-xs font-bold text-white focus:outline-none cursor-pointer [&::-webkit-calendar-picker-indicator]:filter [&::-webkit-calendar-picker-indicator]:invert"
+                className="bg-transparent border-none text-[10px] sm:text-xs font-bold text-[#D4AF37] sm:text-white focus:outline-none cursor-pointer [&::-webkit-calendar-picker-indicator]:filter [&::-webkit-calendar-picker-indicator]:invert p-0 w-[95px] sm:w-auto"
               />
             </div>
           )}
