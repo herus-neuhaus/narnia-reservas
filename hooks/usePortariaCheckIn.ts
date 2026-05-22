@@ -252,6 +252,30 @@ export function usePortariaCheckIn() {
     );
   });
 
+  const updateCustomerPhotoLocally = (customerId: string, photoBase64: string) => {
+    setReservations(prev => prev.map(r => {
+      if (r.customer_id === customerId) {
+        return {
+          ...r,
+          photo: photoBase64,
+          customers: r.customers ? { ...r.customers, photo: photoBase64 } : r.customers
+        };
+      }
+      return r;
+    }));
+
+    if (searchResult?.customer_id === customerId) {
+      setSearchResult(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          photo: photoBase64,
+          customers: prev.customers ? { ...prev.customers, photo: photoBase64 } : prev.customers
+        };
+      });
+    }
+  };
+
   return {
     loading,
     searchTerm,
@@ -279,6 +303,8 @@ export function usePortariaCheckIn() {
     onQuickAddSuccess,
     handleLogout,
     showAlert,
-    alertProps
+    alertProps,
+    fetchTodaysData,
+    updateCustomerPhotoLocally
   };
 }

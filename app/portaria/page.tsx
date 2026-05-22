@@ -46,7 +46,9 @@ export default function PortariaDashboard() {
     toggleCheckInWithPhoto,
     onQuickAddSuccess,
     handleLogout,
-    alertProps
+    alertProps,
+    fetchTodaysData,
+    updateCustomerPhotoLocally
   } = usePortariaCheckIn();
 
   return (
@@ -138,10 +140,10 @@ export default function PortariaDashboard() {
         customerName={profilePhotoModalData?.name}
         initialPhoto={profilePhotoModalData?.photo}
         onSuccess={(newPhoto) => {
-          // This will re-fetch data or update the local state optimistically
+          if (profilePhotoModalData?.customer_id) {
+            updateCustomerPhotoLocally(profilePhotoModalData.customer_id, newPhoto);
+          }
           setProfilePhotoModalData(null);
-          // Let's force a reload to get the new data
-          window.location.reload();
         }}
       />
 
