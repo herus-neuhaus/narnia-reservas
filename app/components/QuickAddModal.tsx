@@ -47,17 +47,20 @@ export default function QuickAddModal({
 
   useEffect(() => {
     if (isOpen) {
-      setQuickFormData({ 
-        name: '', 
-        cpf: '', 
-        birth_date: '',
-        whatsapp: '', 
-        type: 'pulseira', 
-        location_id: '',
-        photo: null
-      });
-      setIsAdding(false);
-      setIsCpfLoading(false);
+      const t = setTimeout(() => {
+        setQuickFormData({ 
+          name: '', 
+          cpf: '', 
+          birth_date: '',
+          whatsapp: '', 
+          type: 'pulseira', 
+          location_id: '',
+          photo: null
+        });
+        setIsAdding(false);
+        setIsCpfLoading(false);
+      }, 10);
+      return () => clearTimeout(t);
     }
   }, [isOpen]);
 
