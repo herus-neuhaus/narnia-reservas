@@ -456,7 +456,7 @@ export default function NarniaClubPortal() {
             <ReservationCheck
               searchCpf={searchCpf}
               setSearchCpf={setSearchCpf}
-              onSearch={handleSearch}
+              onSearch={() => handleSearch(searchCpf)}
               isSearching={isSearching}
               hasSearched={hasSearched}
               userReservations={userReservations}
