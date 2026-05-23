@@ -8,7 +8,6 @@ import { differenceInDays, parseISO } from 'date-fns';
 import { formatToBrlDateTime } from '@/lib/utils';
 import QuickAddModal from '@/app/components/QuickAddModal';
 import CustomAlertDialog from '@/app/components/CustomAlertDialog';
-import PortariaHeader from './components/PortariaHeader';
 import PortariaCounters from './components/PortariaCounters';
 import PortariaSearchResult from './components/PortariaSearchResult';
 import PortariaList from './components/PortariaList';
@@ -33,6 +32,7 @@ export default function PortariaDashboard() {
     isBlacklisted,
     showQuickAdd,
     setShowQuickAdd,
+    quickAddInitialData,
     blacklistAlert,
     setBlacklistAlert,
     duplicateAlert,
@@ -62,27 +62,72 @@ export default function PortariaDashboard() {
     fetchTodaysData,
     updateCustomerPhotoLocally,
     selectedDate,
-    setSelectedDate,
     typeFilter,
     setTypeFilter,
     requestComplimentaryTicket,
     updateComplimentaryStatus,
+    validateComplimentaryEntry,
     registerCamaroteEntry,
     registerExtraCamaroteEntry,
-    event
+    event,
+    selectedEvent,
+    showEventSelector,
+    availableEvents,
+    handleSelectEvent,
+    handleChangeEvent
   } = usePortariaCheckIn();
 
   const stats = getFilteredStats();
 
   return (
     <div className="min-h-screen bg-black font-sans text-white">
-      <PortariaHeader 
-        isAdmin={isAdmin}
-        onAdminClick={() => router.push('/admin')}
-        onLogout={handleLogout}
-        selectedDate={selectedDate}
-        setSelectedDate={setSelectedDate}
-      />
+      {showEventSelector && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/95 backdrop-blur-md animate-in fade-in duration-300">
+          <div className="w-full max-w-lg bg-[#0A0A0A] rounded-[32px] border border-[#D4AF37]/20 p-8 shadow-[0_0_50px_rgba(212,175,55,0.1)] max-h-[90vh] flex flex-col">
+            <h2 className="text-2xl font-black uppercase tracking-widest text-[#D4AF37] mb-6 text-center">Selecione o Evento</h2>
+            <div className="space-y-4 overflow-y-auto pr-2 custom-scrollbar flex-1">
+              {availableEvents.length === 0 ? (
+                <p className="text-center text-white/40 italic">Nenhum evento encontrado.</p>
+              ) : (
+                availableEvents.map((ev) => (
+                  <button
+                    key={ev.id}
+                    onClick={() => handleSelectEvent(ev)}
+                    className="w-full text-left p-5 rounded-2xl bg-white/5 border border-white/10 hover:border-[#D4AF37] hover:bg-[#D4AF37]/10 transition-all flex justify-between items-center group"
+                  >
+                    <div>
+                      <p className="font-bold text-lg text-white group-hover:text-[#D4AF37] transition-colors">{ev.name}</p>
+                      <p className="text-xs text-white/50">{ev.event_date.split('-').reverse().join('/')}</p>
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="flex justify-between items-center px-4 lg:px-8 py-4 bg-[#0A0A0A] border-b border-white/10">
+        <div className="flex items-center gap-4">
+          <h1 className="text-lg lg:text-xl font-black text-[#D4AF37] tracking-widest uppercase">PORTARIA NÁRNIA</h1>
+          {selectedEvent && (
+            <div className="hidden sm:flex items-center gap-3 ml-4 pl-4 border-l border-white/10">
+              <span className="text-xs text-white/60">Trabalhando em:</span>
+              <span className="text-sm font-bold text-white">{selectedEvent.name}</span>
+              <button 
+                onClick={handleChangeEvent}
+                className="text-[10px] font-bold uppercase tracking-widest text-[#D4AF37] border border-[#D4AF37]/30 px-3 py-1.5 rounded-lg hover:bg-[#D4AF37]/10 transition-colors"
+              >
+                Alterar Evento
+              </button>
+            </div>
+          )}
+        </div>
+        <div className="flex items-center gap-4">
+          <button onClick={handleLogout} className="text-xs font-bold text-red-500 uppercase tracking-widest">Sair</button>
+        </div>
+      </div>
+
 
       <main className="p-4 lg:p-8 max-w-5xl mx-auto space-y-6 pb-24">
         
@@ -126,7 +171,7 @@ export default function PortariaDashboard() {
 
         {/* Type Filters */}
         <div className="flex items-center gap-2 overflow-x-auto pb-2 custom-scrollbar">
-          {['Todos', 'Lista', 'Camarote', 'Mesa', 'Pulseira'].map((t) => {
+          {['Todos', 'Lista', 'Cortesia', 'Camarote', 'Mesa', 'Pulseira'].map((t) => {
             const id = t === 'Todos' ? 'all' : t.toLowerCase();
             return (
               <button
@@ -178,6 +223,7 @@ export default function PortariaDashboard() {
               isAdmin={isAdmin}
               onRequest={(cpf, name, notes) => requestComplimentaryTicket({ cpf, name, whatsapp: '', birthDate: '', notes, eventDate: selectedDate })}
               onUpdateStatus={(id, status) => updateComplimentaryStatus(id, status)}
+              onValidateEntry={(customerId) => validateComplimentaryEntry(customerId, selectedDate)}
             />
           </div>
         </div>
@@ -195,6 +241,7 @@ export default function PortariaDashboard() {
         camarotes={camarotes}
         selectedDate={selectedDate}
         event={event}
+        initialData={quickAddInitialData}
       />
 
       <CheckInPhotoModal

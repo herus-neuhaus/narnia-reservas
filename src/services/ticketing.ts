@@ -9,11 +9,16 @@ const supabase = createClient();
 /**
  * Busca todos os lotes de ingressos (pulseiras) para um dia/evento específico.
  */
-export async function fetchTicketBatches(eventDate: string) {
-  const { data, error } = await supabase
-    .from('ticket_batches')
-    .select('*')
-    .eq('event_date', eventDate)
+export async function fetchTicketBatches(eventFilter: { eventDate?: string, eventId?: string }) {
+  let query = supabase.from('ticket_batches').select('*');
+  
+  if (eventFilter.eventId) {
+    query = query.eq('event_id', eventFilter.eventId);
+  } else if (eventFilter.eventDate) {
+    query = query.eq('event_date', eventFilter.eventDate);
+  }
+
+  const { data, error } = await query
     .order('batch_order', { ascending: true })
     .order('created_at', { ascending: true });
     

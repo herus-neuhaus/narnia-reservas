@@ -7,6 +7,9 @@ import { format, parseISO, differenceInYears, parse } from 'date-fns';
 import { cpf } from 'cpf-cnpj-validator';
 import CameraCapture from './CameraCapture';
 import { registerBraceletEntry } from '@/src/services/reservations';
+import CustomAlertDialog from './CustomAlertDialog';
+import { useCustomAlert } from '@/hooks/use-custom-alert';
+import { getPortoVelhoTime, isCortesiaExpired } from '@/lib/date-utils';
 
 interface QuickAddModalProps {
   isOpen: boolean;
@@ -19,6 +22,13 @@ interface QuickAddModalProps {
   camarotes?: any[];
   selectedDate: string;
   event?: any;
+  initialData?: {
+    cpf: string;
+    name: string;
+    whatsapp: string;
+    birth_date: string;
+    photo: string | null;
+  } | null;
 }
 
 export default function QuickAddModal({
@@ -31,8 +41,10 @@ export default function QuickAddModal({
   reservations,
   camarotes = [],
   selectedDate,
-  event
+  event,
+  initialData
 }: QuickAddModalProps) {
+  const { showAlert, alertProps } = useCustomAlert();
   const [isAdding, setIsAdding] = useState(false);
   const [isCpfLoading, setIsCpfLoading] = useState(false);
   const [quickFormData, setQuickFormData] = useState({ 
@@ -47,63 +59,39 @@ export default function QuickAddModal({
 
   const supabase = createClient();
 
-  const getPortoVelhoTime = () => {
-    const now = new Date();
-    const formatter = new Intl.DateTimeFormat('pt-BR', {
-      timeZone: 'America/Porto_Velho',
-      year: 'numeric', month: '2-digit', day: '2-digit',
-      hour: '2-digit', minute: '2-digit', second: '2-digit',
-      hour12: false
-    });
-    
-    const parts = formatter.formatToParts(now);
-    const getValue = (type: string) => parts.find(p => p.type === type)?.value || '';
-    return `${getValue('year')}-${getValue('month')}-${getValue('day')} ${getValue('hour')}:${getValue('minute')}:${getValue('second')}`;
-  };
-
-  const isCortesiaExpired = () => {
-    if (!event || !event.list_limit_time) return false;
-    
-    const currentPvTime = getPortoVelhoTime();
-    const [currentDate, currentTime] = currentPvTime.split(' ');
-    const limitTime = event.list_limit_time;
-    
-    const [limitH] = limitTime.split(':').map(Number);
-    const limitDayOffset = limitH < 12 ? 1 : 0;
-    
-    const buildAbsolute = (dateStr: string, timeStr: string, dayOffset: number) => {
-       const d = new Date(dateStr + 'T12:00:00Z');
-       d.setDate(d.getDate() + dayOffset);
-       const yyyy = d.getFullYear();
-       const mm = String(d.getMonth() + 1).padStart(2, '0');
-       const dd = String(d.getDate()).padStart(2, '0');
-       return `${yyyy}${mm}${dd}${timeStr.replace(/:/g, '')}`;
-    };
-    
-    const currentAbs = currentDate.replace(/-/g, '') + currentTime.replace(/:/g, '');
-    const limitAbs = buildAbsolute(selectedDate, limitTime, limitDayOffset);
-    
-    return currentAbs > limitAbs;
-  };
 
   useEffect(() => {
     if (isOpen) {
       const t = setTimeout(() => {
-        setQuickFormData({ 
-          name: '', 
-          cpf: '', 
-          birth_date: '',
-          whatsapp: '', 
-          type: 'pulseira', 
-          location_id: '',
-          photo: null
-        });
+        if (initialData) {
+          // Pre-fill with the provided initial data
+          setQuickFormData({ 
+            name: initialData.name || '', 
+            cpf: initialData.cpf || '', 
+            birth_date: initialData.birth_date || '',
+            whatsapp: initialData.whatsapp || '', 
+            type: 'pulseira', 
+            location_id: '',
+            photo: initialData.photo || null
+          });
+        } else {
+          // Empty form
+          setQuickFormData({ 
+            name: '', 
+            cpf: '', 
+            birth_date: '',
+            whatsapp: '', 
+            type: 'pulseira', 
+            location_id: '',
+            photo: null
+          });
+        }
         setIsAdding(false);
         setIsCpfLoading(false);
       }, 10);
       return () => clearTimeout(t);
     }
-  }, [isOpen]);
+  }, [isOpen, initialData]);
 
   const formatCPF = (value: string) => {
     return value
@@ -133,8 +121,12 @@ export default function QuickAddModal({
 
   const toIsoDate = (brDate: string) => {
     if (!brDate || brDate.length !== 10) return brDate;
-    const [d, m, y] = brDate.split('/');
-    return `${y}-${m}-${d}`;
+    if (brDate.includes('-')) return brDate;
+    if (brDate.includes('/')) {
+      const [d, m, y] = brDate.split('/');
+      return `${y}-${m}-${d}`;
+    }
+    return brDate;
   };
 
   const toBrDate = (isoDate: string) => {
@@ -145,23 +137,23 @@ export default function QuickAddModal({
 
   const handleQuickAdd = async () => {
     if (!quickFormData.name || !quickFormData.cpf) {
-      alert('Nome e CPF são obrigatórios.');
+      showAlert('Campos Obrigatórios', 'Nome e CPF são obrigatórios.', 'warning');
       return;
     }
 
     if (!cpf.isValid(quickFormData.cpf)) {
-      alert('CPF inválido. Por favor, verifique o número informado.');
+      showAlert('CPF Inválido', 'CPF inválido. Por favor, verifique o número informado.', 'warning');
       return;
     }
 
     if (!quickFormData.birth_date || quickFormData.birth_date.length !== 10) {
-      alert('Data de nascimento inválida (use o formato DD/MM/AAAA).');
+      showAlert('Data de Nascimento', 'Data de nascimento inválida (use o formato DD/MM/AAAA).', 'warning');
       return;
     }
 
     const age = differenceInYears(new Date(), parse(quickFormData.birth_date, 'dd/MM/yyyy', new Date()));
     if (age < 18) {
-      alert('Entrada/Reserva bloqueada: O Nárnia Club permite o acesso apenas para maiores de 18 anos.');
+      showAlert('Acesso Restrito', 'Entrada/Reserva bloqueada: O Nárnia Club permite o acesso apenas para maiores de 18 anos.', 'error');
       return;
     }
 
@@ -176,55 +168,27 @@ export default function QuickAddModal({
     const cleanCpfInput = quickFormData.cpf.replace(/\D/g, '');
     const alreadyHasReservation = reservations.find(r => r.cpf && r.cpf.replace(/\D/g, '') === cleanCpfInput);
     if (alreadyHasReservation) {
-      onDuplicate(alreadyHasReservation);
-      return;
+      // Allow pulseira sale if the person hasn't entered yet and isn't already a pulseira
+      if (quickFormData.type === 'pulseira' && alreadyHasReservation.check_in_status !== 'entered' && alreadyHasReservation.type !== 'pulseira') {
+        // Proceed to sell ticket
+      } else {
+        onDuplicate(alreadyHasReservation);
+        return;
+      }
     }
 
     setIsAdding(true);
     const today = selectedDate;
 
-    // 1. Upsert do cliente na tabela customers
-    let customerId: string | null = null;
-    try {
-      const { data: customer } = await supabase
-        .from('customers')
-        .select('id, photo')
-        .eq('cpf', quickFormData.cpf)
-        .maybeSingle();
-
-      if (customer) {
-        customerId = customer.id;
-        await supabase
-          .from('customers')
-          .update({
-            name: quickFormData.name,
-            whatsapp: quickFormData.whatsapp,
-            birth_date: toIsoDate(quickFormData.birth_date),
-            photo: quickFormData.photo || customer.photo
-          })
-          .eq('id', customerId);
-      } else {
-        const { data: newCustomer, error: customerErr } = await supabase
-          .from('customers')
-          .insert([{
-            cpf: quickFormData.cpf,
-            name: quickFormData.name,
-            whatsapp: quickFormData.whatsapp,
-            birth_date: toIsoDate(quickFormData.birth_date),
-            email: `portaria_${quickFormData.cpf.replace(/\D/g, '')}@narnia.com`,
-            photo: quickFormData.photo
-          }])
-          .select('id')
-          .single();
-
-        if (customerErr) throw customerErr;
-        customerId = newCustomer.id;
+    let finalPhotoUrl = quickFormData.photo;
+    if (finalPhotoUrl && finalPhotoUrl.startsWith('data:image')) {
+      const { uploadCustomerPhoto } = await import('@/src/services/storage');
+      try {
+        finalPhotoUrl = await uploadCustomerPhoto(finalPhotoUrl, quickFormData.cpf.replace(/\D/g, ''));
+      } catch (uploadErr) {
+        console.error('Photo upload failed:', uploadErr);
+        showAlert('Erro de Foto', 'Não foi possível salvar a foto, mas o registro continuará.', 'warning');
       }
-    } catch (e: any) {
-      console.error('Error handling customer in QuickAddModal:', e);
-      alert('Erro ao cadastrar cliente: ' + (e.message || e));
-      setIsAdding(false);
-      return;
     }
 
     if (quickFormData.type === 'pulseira') {
@@ -234,7 +198,7 @@ export default function QuickAddModal({
           name: quickFormData.name,
           whatsapp: quickFormData.whatsapp,
           birthDate: toIsoDate(quickFormData.birth_date),
-          photo: quickFormData.photo,
+          photo: finalPhotoUrl,
           eventDate: selectedDate
         });
         
@@ -248,15 +212,15 @@ export default function QuickAddModal({
             entered_at: getPortoVelhoTime(),
             reservation_date: selectedDate,
             reservation_time: format(new Date(), 'HH:mm'),
-            photo: quickFormData.photo
+            photo: finalPhotoUrl
           });
           setQuickFormData({ name: '', cpf: '', birth_date: '', whatsapp: '', type: 'pulseira', location_id: '', photo: null });
           onClose();
         } else {
-          alert('Erro ao registrar pulseira: ' + (braceletRes?.message || 'Desconhecido'));
+          showAlert('Erro ao registrar', braceletRes?.message || 'Erro desconhecido.', 'error');
         }
       } catch (err: any) {
-        alert('Erro ao registrar pulseira: ' + err.message);
+        showAlert('Erro', 'Não foi possível registrar a pulseira.', 'error');
       }
       setIsAdding(false);
       return;
@@ -265,7 +229,7 @@ export default function QuickAddModal({
     if (quickFormData.type === 'camarote') {
       const selectedCamarote = camarotes.find(c => c.name === quickFormData.location_id);
       if (!selectedCamarote) {
-        alert('Selecione um camarote válido.');
+        showAlert('Camarote Inválido', 'Selecione um camarote válido.', 'warning');
         setIsAdding(false);
         return;
       }
@@ -277,6 +241,12 @@ export default function QuickAddModal({
         p_whatsapp: quickFormData.whatsapp,
         p_birth_date: toIsoDate(quickFormData.birth_date)
       });
+
+      // Note: If you want to update the photo of a camarote guest, you need to do it after or modify the RPC.
+      // Doing an additional update to customers table here just in case:
+      if (!error && finalPhotoUrl && finalPhotoUrl.startsWith('http')) {
+         await supabase.from('customers').update({ photo: finalPhotoUrl }).eq('cpf', quickFormData.cpf.replace(/\D/g, ''));
+      }
 
       if (error) {
         const isDuplicate = error.code === '23505' || error.message?.includes('já registrado') || error.message?.includes('duplicate');
@@ -290,9 +260,9 @@ export default function QuickAddModal({
             check_in_status: 'entered'
           });
         } else if (error.message?.includes('FULL') || error.message?.includes('lotado')) {
-          alert('Camarote lotado! Apenas o admin/gerente pode autorizar a entrada como EXTRA.');
+          showAlert('Camarote Lotado', 'Camarote lotado! Apenas o admin/gerente pode autorizar a entrada como EXTRA.', 'error');
         } else {
-          alert('Erro ao registrar entrada no camarote: ' + error.message);
+          showAlert('Erro ao registrar', error.message, 'error');
         }
       } else if (data && data.success) {
         onSuccess({
@@ -305,46 +275,36 @@ export default function QuickAddModal({
           entered_at: getPortoVelhoTime(),
           reservation_date: selectedDate,
           reservation_time: format(new Date(), 'HH:mm'),
-          photo: quickFormData.photo
+          photo: finalPhotoUrl
         });
         setQuickFormData({ name: '', cpf: '', birth_date: '', whatsapp: '', type: 'pulseira', location_id: '', photo: null });
         onClose();
       } else {
-        alert('Erro ao registrar entrada no camarote: ' + (data?.message || 'Erro desconhecido.'));
+        showAlert('Erro ao registrar', data?.message || 'Erro desconhecido.', 'error');
       }
       setIsAdding(false);
       return;
     }
 
-    // 2. Inserção da reserva vinculada para outros tipos (Legacy)
-    const { data, error } = await supabase
-      .from('reservations')
-      .insert([{
-        customer_id: customerId,
-        // Legacy fallback columns
-        name: quickFormData.name,
-        email: `portaria_${quickFormData.cpf.replace(/\D/g, '')}@narnia.com`,
-        cpf: quickFormData.cpf,
-        birth_date: toIsoDate(quickFormData.birth_date),
-        whatsapp: quickFormData.whatsapp,
-        reservation_date: today,
-        reservation_time: format(new Date(), 'HH:mm'),
-        type: quickFormData.type,
-        location_id: quickFormData.type === 'mesa' ? quickFormData.location_id : null,
-        check_in_status: 'entered',
-        entered_at: getPortoVelhoTime(),
-        num_guests: 1,
-        photo: quickFormData.photo
-      }])
-      .select()
-      .single();
+    // 2. Inserção da reserva vinculada para outros tipos (Legacy) via RPC atômica
+    const { data, error } = await supabase.rpc('quick_add_portaria_entry', {
+      p_cpf: quickFormData.cpf,
+      p_name: quickFormData.name,
+      p_whatsapp: quickFormData.whatsapp,
+      p_birth_date: toIsoDate(quickFormData.birth_date),
+      p_type: quickFormData.type,
+      p_location_id: quickFormData.type === 'mesa' ? quickFormData.location_id : null,
+      p_event_date: today,
+      p_photo: finalPhotoUrl
+    });
 
-    if (!error && data) {
-      onSuccess(data);
+    if (!error && data && data.success) {
+      onSuccess(data.data);
       setQuickFormData({ name: '', cpf: '', birth_date: '', whatsapp: '', type: 'pulseira', location_id: '', photo: null });
       onClose();
     } else {
-      const isDuplicate = error?.code === '23505' || error?.message?.includes('duplicate key') || error?.message?.includes('unique_reservation_date_cpf') || error?.message?.includes('unique_reservation_date_customer');
+      const isDuplicate = error?.code === '23505' || error?.message?.includes('duplicate key') || 
+                          data?.error_code === 'DUPLICATE_ENTRY';
       if (isDuplicate) {
         onDuplicate({
           name: quickFormData.name,
@@ -355,7 +315,7 @@ export default function QuickAddModal({
           check_in_status: 'entered'
         });
       } else {
-        alert('Erro ao cadastrar: ' + (error?.message || 'Desconhecido'));
+        showAlert('Erro ao cadastrar', error?.message || data?.message || 'Desconhecido', 'error');
       }
     }
     setIsAdding(false);
@@ -407,57 +367,39 @@ export default function QuickAddModal({
                   }
 
                   setIsCpfLoading(true);
-                  supabase
-                    .from('customers')
-                    .select('*')
-                    .eq('cpf_digits', cleanCpf)
-                    .maybeSingle()
-                    .then(({ data, error }) => {
-                      if (!error && data) {
-                        setIsCpfLoading(false);
-                        if (data.birth_date) {
-                          const age = differenceInYears(new Date(), parseISO(data.birth_date));
-                          if (age < 18) {
-                            alert('Acesso Restrito: O Nárnia Club permite a entrada apenas para pessoas com 18 anos ou mais.');
-                          }
-                        }
+                  Promise.all([
+                    supabase.from('customers').select('*').eq('cpf_digits', cleanCpf).maybeSingle(),
+                    supabase.rpc('get_reservations_by_cpf', { p_cpf: cleanCpf })
+                  ]).then(([customersRes, reservationsRes]) => {
+                    setIsCpfLoading(false);
+                    
+                    const cust = customersRes.data;
+                    const resvs = reservationsRes.data || [];
+                    const latest = resvs.length > 0 ? resvs[0] : null;
+                    const resvPhoto = resvs.find((r: any) => r.photo)?.photo;
 
-                        setQuickFormData(prev => ({
-                          ...prev,
-                          name: data.name || prev.name,
-                          whatsapp: data.whatsapp || prev.whatsapp,
-                          birth_date: data.birth_date ? toBrDate(data.birth_date) : prev.birth_date || '',
-                          photo: data.photo || prev.photo
-                        }));
-                      } else {
-                        // Fallback to legacy reservations check if not in customers yet
-                        supabase
-                          .rpc('get_reservations_by_cpf', { p_cpf: cleanCpf })
-                          .then(({ data: pastData, error: pastError }) => {
-                            setIsCpfLoading(false);
-                            if (!pastError && pastData && pastData.length > 0) {
-                              const latest = pastData[0];
-                              const reservationWithPhoto = pastData.find((r: any) => r.photo);
-                              const photoUrlOrBase64 = reservationWithPhoto ? reservationWithPhoto.photo : null;
-                              
-                              if (latest.birth_date) {
-                                const age = differenceInYears(new Date(), parseISO(latest.birth_date));
-                                if (age < 18) {
-                                  alert('Acesso Restrito: O Nárnia Club permite a entrada apenas para pessoas com 18 anos ou mais.');
-                                }
-                              }
+                    const finalName = cust?.name || latest?.name || '';
+                    const finalWhatsapp = cust?.whatsapp || latest?.whatsapp || '';
+                    const finalBirth = cust?.birth_date || latest?.birth_date || '';
+                    const finalPhoto = cust?.photo || resvPhoto || null;
 
-                              setQuickFormData(prev => ({
-                                ...prev,
-                                name: latest.name || prev.name,
-                                whatsapp: latest.whatsapp || prev.whatsapp,
-                                birth_date: latest.birth_date ? toBrDate(latest.birth_date) : prev.birth_date || '',
-                                photo: photoUrlOrBase64 || prev.photo
-                              }));
-                            }
-                          });
+                    if (finalBirth) {
+                      const age = differenceInYears(new Date(), parseISO(finalBirth));
+                      if (age < 18) {
+                        showAlert('Acesso Restrito', 'O Nárnia Club permite a entrada apenas para pessoas com 18 anos ou mais.', 'error');
                       }
-                    });
+                    }
+
+                    setQuickFormData(prev => ({
+                      ...prev,
+                      name: finalName,
+                      whatsapp: finalWhatsapp,
+                      birth_date: finalBirth ? toBrDate(finalBirth) : '',
+                      photo: finalPhoto
+                    }));
+                  }).catch(() => {
+                    setIsCpfLoading(false);
+                  });
                 }
               }}
               placeholder="000.000.000-00"
@@ -508,7 +450,7 @@ export default function QuickAddModal({
             <label className="text-[10px] font-bold uppercase tracking-widest text-white/30 ml-4 mb-1 block">Tipo de Acesso</label>
             <div className="grid grid-cols-3 gap-2">
               {[
-                { id: 'lista', label: 'Cortesia', disabled: isCortesiaExpired() },
+                { id: 'lista', label: 'Cortesia', disabled: isCortesiaExpired(event, selectedDate) },
                 { id: 'camarote', label: 'VIP' },
                 { id: 'pulseira', label: 'Pulseira' }
               ].map((t) => (
@@ -530,7 +472,7 @@ export default function QuickAddModal({
                 </button>
               ))}
             </div>
-            {isCortesiaExpired() && (
+            {isCortesiaExpired(event, selectedDate) && (
               <p className="text-[10px] text-red-500/80 mt-2 ml-4 italic">
                 O horário de cortesia ({event?.list_limit_time}) já encerrou. Utilize Pulseira.
               </p>
@@ -599,6 +541,7 @@ export default function QuickAddModal({
             {isAdding ? <Loader2 className="animate-spin" /> : 'CONCLUIR E ENTRAR'}
           </button>
         </div>
+        <CustomAlertDialog {...alertProps} />
       </div>
     </div>
   );

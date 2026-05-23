@@ -25,7 +25,7 @@ import {
 import { fetchTodaysReservations } from '@/src/services/reservations';
 import { createClient } from '@/lib/supabase/client';
 
-export default function BoxOfficeManager() {
+export default function BoxOfficeManager({ eventId }: { eventId?: string }) {
   const [activeTab, setActiveTab] = useState<'lotes' | 'cortesias' | 'camarotes' | 'fechamento'>('lotes');
   const [selectedDate, setSelectedDate] = useState(format(startOfToday(), 'yyyy-MM-dd'));
   const [loading, setLoading] = useState(false);
@@ -46,7 +46,7 @@ export default function BoxOfficeManager() {
       setAdminId(user?.id || null);
 
       const [bData, cData, camData, rData, resData] = await Promise.all([
-        fetchTicketBatches(selectedDate),
+        fetchTicketBatches({ eventDate: selectedDate }),
         fetchComplimentaryTickets(selectedDate),
         fetchCamarotesWithOccupation(selectedDate),
         fetchBoxOfficeReport(selectedDate),
@@ -129,7 +129,7 @@ export default function BoxOfficeManager() {
           </div>
         ) : (
           <>
-            {activeTab === 'lotes' && <BatchesTab batches={batches} eventDate={selectedDate} onReload={loadData} />}
+            {activeTab === 'lotes' && <BatchesTab batches={batches} eventDate={selectedDate} eventId={eventId} onReload={loadData} />}
             {activeTab === 'cortesias' && <ComplimentaryTab complimentary={complimentary} adminId={adminId} onReload={loadData} />}
             {activeTab === 'camarotes' && <CamarotesTab camarotes={camarotes} adminId={adminId} onReload={loadData} />}
             {activeTab === 'fechamento' && <BoxOfficeTab report={report} eventDate={selectedDate} adminId={adminId} onReload={loadData} batches={batches} complimentary={complimentary} camarotes={camarotes} reservations={reservations} />}
@@ -140,13 +140,25 @@ export default function BoxOfficeManager() {
   );
 }
 
-function BatchesTab({ batches, eventDate, onReload }: any) {
+function BatchesTab({ batches, eventDate, eventId, onReload }: any) {
   const [isCreating, setIsCreating] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
   const [quantity, setQuantity] = useState('');
   const [order, setOrder] = useState('1');
+  const [selectedEventId, setSelectedEventId] = useState<string>(eventId || '');
+  const [events, setEvents] = useState<any[]>([]);
+
+  const supabase = createClient();
+
+  useEffect(() => {
+    if (!eventId) {
+      supabase.from('events').select('id, name, event_date').order('event_date', { ascending: false }).limit(20).then(({ data }) => {
+        if (data) setEvents(data);
+      });
+    }
+  }, [eventId, supabase]);
 
   const resetForm = () => {
     setIsCreating(false);
@@ -155,6 +167,7 @@ function BatchesTab({ batches, eventDate, onReload }: any) {
     setPrice('');
     setQuantity('');
     setOrder('1');
+    if (!eventId) setSelectedEventId('');
   };
 
   const handleEdit = (b: any) => {
@@ -163,6 +176,7 @@ function BatchesTab({ batches, eventDate, onReload }: any) {
     setPrice(b.price.toString());
     setQuantity(b.total_quantity.toString());
     setOrder(b.batch_order.toString());
+    if (b.event_id) setSelectedEventId(b.event_id);
     setIsCreating(true);
   };
 
@@ -178,16 +192,24 @@ function BatchesTab({ batches, eventDate, onReload }: any) {
 
   const handleSave = async () => {
     try {
+      if (!selectedEventId && !editingId) {
+        throw new Error('Selecione o evento vinculado a este lote.');
+      }
+      
       if (editingId) {
         await updateTicketBatch(editingId, {
           name,
           price: Number(price),
           total_quantity: Number(quantity),
-          batch_order: Number(order)
+          batch_order: Number(order),
+          event_id: selectedEventId || undefined
         });
       } else {
+        const evDateToUse = eventId ? eventDate : (events.find(e => e.id === selectedEventId)?.event_date || eventDate);
+        
         await createTicketBatch({
-          event_date: eventDate,
+          event_date: evDateToUse,
+          event_id: selectedEventId,
           name,
           price: Number(price),
           total_quantity: Number(quantity),
@@ -230,26 +252,39 @@ function BatchesTab({ batches, eventDate, onReload }: any) {
       </div>
 
       {isCreating && (
-        <div className="bg-white/5 p-6 rounded-2xl border border-white/10 flex flex-wrap md:flex-nowrap gap-4 items-end">
-          <div className="flex-1 min-w-[200px]">
-            <label className="text-[10px] uppercase text-white/40 font-bold mb-1 block">Nome do Lote</label>
-            <input type="text" placeholder="Ex: Lote 1" value={name} onChange={e => setName(e.target.value)} className="w-full bg-black border border-white/10 rounded-xl px-4 py-2 text-sm" />
+        <div className="bg-white/5 p-6 rounded-2xl border border-white/10 flex flex-col gap-4">
+          {!eventId && (
+            <div>
+              <label className="text-[10px] uppercase text-white/40 font-bold mb-1 block">Evento Vinculado</label>
+              <select value={selectedEventId} onChange={e => setSelectedEventId(e.target.value)} className="w-full bg-black border border-white/10 rounded-xl px-4 py-2 text-sm text-white">
+                <option value="">-- Selecione o Evento --</option>
+                {events.map(ev => (
+                  <option key={ev.id} value={ev.id}>{ev.name} ({ev.event_date?.split('-').reverse().join('/')})</option>
+                ))}
+              </select>
+            </div>
+          )}
+          <div className="flex flex-wrap md:flex-nowrap gap-4 items-end">
+            <div className="flex-1 min-w-[200px]">
+              <label className="text-[10px] uppercase text-white/40 font-bold mb-1 block">Nome do Lote</label>
+              <input type="text" placeholder="Ex: Lote 1" value={name} onChange={e => setName(e.target.value)} className="w-full bg-black border border-white/10 rounded-xl px-4 py-2 text-sm" />
+            </div>
+            <div className="w-32">
+              <label className="text-[10px] uppercase text-white/40 font-bold mb-1 block">Valor (R$)</label>
+              <input type="number" placeholder="50.00" value={price} onChange={e => setPrice(e.target.value)} className="w-full bg-black border border-white/10 rounded-xl px-4 py-2 text-sm" />
+            </div>
+            <div className="w-24">
+              <label className="text-[10px] uppercase text-white/40 font-bold mb-1 block">Ordem</label>
+              <input type="number" placeholder="1" value={order} onChange={e => setOrder(e.target.value)} className="w-full bg-black border border-white/10 rounded-xl px-4 py-2 text-sm" />
+            </div>
+            <div className="w-32">
+              <label className="text-[10px] uppercase text-white/40 font-bold mb-1 block">Quantidade</label>
+              <input type="number" placeholder="100" value={quantity} onChange={e => setQuantity(e.target.value)} className="w-full bg-black border border-white/10 rounded-xl px-4 py-2 text-sm" />
+            </div>
+            <button onClick={handleSave} className="bg-green-500 text-black px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest h-[38px]">
+              Salvar
+            </button>
           </div>
-          <div className="w-32">
-            <label className="text-[10px] uppercase text-white/40 font-bold mb-1 block">Valor (R$)</label>
-            <input type="number" placeholder="50.00" value={price} onChange={e => setPrice(e.target.value)} className="w-full bg-black border border-white/10 rounded-xl px-4 py-2 text-sm" />
-          </div>
-          <div className="w-24">
-            <label className="text-[10px] uppercase text-white/40 font-bold mb-1 block">Ordem</label>
-            <input type="number" placeholder="1" value={order} onChange={e => setOrder(e.target.value)} className="w-full bg-black border border-white/10 rounded-xl px-4 py-2 text-sm" />
-          </div>
-          <div className="w-32">
-            <label className="text-[10px] uppercase text-white/40 font-bold mb-1 block">Quantidade</label>
-            <input type="number" placeholder="100" value={quantity} onChange={e => setQuantity(e.target.value)} className="w-full bg-black border border-white/10 rounded-xl px-4 py-2 text-sm" />
-          </div>
-          <button onClick={handleSave} className="bg-green-500 text-black px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest h-[38px]">
-            Salvar
-          </button>
         </div>
       )}
 

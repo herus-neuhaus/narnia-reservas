@@ -1,11 +1,24 @@
 import { createClient } from '@/lib/supabase/client';
 import { Database } from '@/lib/supabase/database.types';
 
-export type ReservationRow = Database['public']['Tables']['reservations']['Row'] & { customers?: any };
+export type CustomerRow = Database['public']['Tables']['customers']['Row'];
+export type ReservationRow = Database['public']['Tables']['reservations']['Row'];
+
+export type ReservationWithCustomer = ReservationRow & {
+  customers: CustomerRow | null;
+};
+
+export type FormattedReservation = ReservationRow & {
+  customers: CustomerRow | null;
+  name: string;
+  cpf: string | null;
+  whatsapp: string;
+  photo: string | null;
+};
 
 const supabase = createClient();
 
-export async function fetchReservationsByDateRange(startDate: string, endDate: string) {
+export async function fetchReservationsByDateRange(startDate: string, endDate: string): Promise<FormattedReservation[]> {
   const { data, error } = await supabase
     .from('reservations')
     .select('*, customers(*)')
@@ -15,7 +28,11 @@ export async function fetchReservationsByDateRange(startDate: string, endDate: s
     .order('reservation_time', { ascending: true });
 
   if (error) throw error;
-  return (data || []).map((res: any) => ({
+  
+  // Cast data since PostgREST joins type mapping might not perfectly match our custom type
+  const reservations = (data as unknown) as ReservationWithCustomer[];
+  
+  return reservations.map(res => ({
     ...res,
     name: res.customers?.name || res.name,
     cpf: res.customers?.cpf || res.cpf,
@@ -24,7 +41,7 @@ export async function fetchReservationsByDateRange(startDate: string, endDate: s
   }));
 }
 
-export async function fetchTodaysReservations(today: string) {
+export async function fetchTodaysReservations(today: string): Promise<FormattedReservation[]> {
   const { data, error } = await supabase
     .from('reservations')
     .select('*, customers(*)')
@@ -32,13 +49,15 @@ export async function fetchTodaysReservations(today: string) {
 
   if (error) throw error;
 
-  return (data || []).map((res: any) => ({
+  const reservations = (data as unknown) as ReservationWithCustomer[];
+
+  return reservations.map(res => ({
     ...res,
     name: res.customers?.name || res.name,
     cpf: res.customers?.cpf || res.cpf,
     whatsapp: res.customers?.whatsapp || res.whatsapp,
     photo: res.customers?.photo || res.photo
-  })).sort((a: any, b: any) => {
+  })).sort((a, b) => {
     const nameA = a.name || '';
     const nameB = b.name || '';
     return nameA.localeCompare(nameB);
@@ -76,7 +95,7 @@ export async function getCustomerByCpf(cpf: string): Promise<{
   return data && data.length > 0 ? data[0] : null;
 }
 
-export async function updateReservationStatus(id: string, status: string) {
+export async function updateReservationStatus(id: string, status: string): Promise<void> {
   const { error } = await supabase
     .from('reservations')
     .update({ status })
@@ -117,46 +136,59 @@ export async function createReservationAtomic(params: {
   return typeof data === 'string' ? JSON.parse(data) : data;
 }
 
-export async function fetchFullyBookedDates() {
+export async function fetchFullyBookedDates(): Promise<string[]> {
   const { data, error } = await supabase
     .rpc('get_fully_booked_dates');
   if (error) throw error;
   return (data || []).map((d: any) => d.reservation_date);
 }
 
-export async function fetchReservedLocations(date: string) {
+export async function fetchReservedLocations(date: string): Promise<string[]> {
+  // @ts-ignore - Supabase RPC overload typings issue
   const { data, error } = await supabase
     .rpc('get_reserved_locations', { p_date: date });
   if (error) throw error;
-  return (data || []).map((r: any) => r.location_id);
+  
+  // Since the rpc return type might be overloaded or wrong in the generic, we cast
+  return ((data as unknown) as Array<{ location_id: string }> || []).map((r) => r.location_id);
 }
 
-export async function updateCheckInStatusWithPhoto(id: string, newStatus: string, enteredAt: string | null, photoBase64: string | null, customerId: string | null) {
-  const updateData: any = { 
-    check_in_status: newStatus,
-    entered_at: enteredAt
-  };
+export async function updateCheckInStatusWithPhoto(id: string, newStatus: string, enteredAt: string | null, photoData: string | null, customerId: string | null) {
+  let finalPhotoUrl = null;
 
-  if (photoBase64) {
-    updateData.photo = photoBase64;
-    if (customerId) {
-      await supabase
-        .from('customers')
-        .update({ photo: photoBase64 })
-        .eq('id', customerId);
+  if (photoData) {
+    finalPhotoUrl = photoData;
+    // Check if it's a base64 image
+    if (photoData.startsWith('data:image')) {
+      const { uploadCustomerPhoto } = await import('./storage');
+      const identifier = customerId || id;
+      finalPhotoUrl = await uploadCustomerPhoto(photoData, identifier);
     }
   }
 
-  const { error } = await supabase
-    .from('reservations')
-    .update(updateData)
-    .eq('id', id);
+  // Call the new RPC which handles the update AND validation (like list time limits)
+  const { data, error } = await supabase.rpc('update_check_in_status_with_photo', {
+    p_reservation_id: id,
+    p_new_status: newStatus,
+    p_photo: finalPhotoUrl
+  });
 
-  if (error) throw error;
-  return updateData;
+  if (error) {
+    // Standard Supabase RPC error
+    throw error;
+  }
+
+  // Handle custom exceptions raised by the RPC (Postgres RAISE EXCEPTION returns standard error,
+  // but if the RPC returned jsonb with { success: false, error: ... } we catch it here)
+  if (data && typeof data === 'object' && !data.success) {
+    const errorMsg = data.message || data.error || 'Erro ao atualizar check-in.';
+    throw new Error(errorMsg);
+  }
+
+  return { check_in_status: newStatus, entered_at: enteredAt, photo: finalPhotoUrl };
 }
 
-export async function fetchCustomerPhoto(customerId: string) {
+export async function fetchCustomerPhoto(customerId: string): Promise<string | null> {
   const { data, error } = await supabase
     .from('customers')
     .select('photo')
@@ -175,12 +207,20 @@ export async function registerBraceletEntry(params: {
   photo: string | null;
   eventDate: string;
 }) {
+  let finalPhotoUrl = params.photo || '';
+  
+  if (params.photo && params.photo.startsWith('data:image')) {
+    const { uploadCustomerPhoto } = await import('./storage');
+    // Using CPF as identifier for the photo
+    finalPhotoUrl = await uploadCustomerPhoto(params.photo, params.cpf);
+  }
+
   const { data, error } = await supabase.rpc('create_bracelet_entry_v2', {
     p_cpf: params.cpf,
     p_name: params.name,
     p_whatsapp: params.whatsapp,
     p_birth_date: params.birthDate,
-    p_photo: params.photo || '',
+    p_photo: finalPhotoUrl,
     p_event_date: params.eventDate
   });
 

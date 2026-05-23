@@ -3,16 +3,21 @@
 import React, { useState } from 'react';
 import { Gift, Loader2, CheckCircle, XCircle, Clock } from 'lucide-react';
 import { formatToBrlDateTime } from '@/lib/utils';
+import CustomAlertDialog from '@/app/components/CustomAlertDialog';
+import { useCustomAlert } from '@/hooks/use-custom-alert';
 
 interface ComplimentaryWidgetProps {
   complimentaryTickets: any[];
   onRequest: (cpf: string, name: string, notes: string) => Promise<any>;
   onUpdateStatus: (id: string, status: 'approved' | 'rejected') => Promise<void>;
+  onValidateEntry?: (customerId: string) => Promise<void>;
   isAdmin: boolean;
 }
 
-export default function ComplimentaryWidget({ complimentaryTickets, onRequest, onUpdateStatus, isAdmin }: ComplimentaryWidgetProps) {
+export default function ComplimentaryWidget({ complimentaryTickets, onRequest, onUpdateStatus, onValidateEntry, isAdmin }: ComplimentaryWidgetProps) {
+  const { showAlert, alertProps } = useCustomAlert();
   const [loading, setLoading] = useState(false);
+  const [validatingId, setValidatingId] = useState<string | null>(null);
   const [cpf, setCpf] = useState('');
   const [name, setName] = useState('');
   const [notes, setNotes] = useState('');
@@ -20,18 +25,18 @@ export default function ComplimentaryWidget({ complimentaryTickets, onRequest, o
   const handleRequest = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!cpf || !name) {
-      alert('CPF e Nome são obrigatórios.');
+      showAlert('Campos Obrigatórios', 'CPF e Nome são obrigatórios.', 'warning');
       return;
     }
     setLoading(true);
     try {
       await onRequest(cpf, name, notes);
-      alert('Cortesia solicitada! Aguardando aprovação.');
+      showAlert('Sucesso', 'Cortesia solicitada! Aguardando aprovação.', 'success');
       setCpf('');
       setName('');
       setNotes('');
     } catch (err: any) {
-      alert(err.message || 'Erro ao solicitar cortesia');
+      showAlert('Erro', err.message || 'Erro ao solicitar cortesia', 'error');
     } finally {
       setLoading(false);
     }
@@ -41,7 +46,20 @@ export default function ComplimentaryWidget({ complimentaryTickets, onRequest, o
     try {
       await onUpdateStatus(id, status);
     } catch (err: any) {
-      alert(err.message || 'Erro ao atualizar status');
+      showAlert('Erro', err.message || 'Erro ao atualizar status', 'error');
+    }
+  };
+
+  const handleValidateEntry = async (ticket: any) => {
+    if (!onValidateEntry || !ticket.customer_id) return;
+    setValidatingId(ticket.id);
+    try {
+      await onValidateEntry(ticket.customer_id);
+      showAlert('Sucesso', 'Entrada validada com sucesso!', 'success');
+    } catch (err: any) {
+      showAlert('Erro', err.message || 'Erro ao validar entrada', 'error');
+    } finally {
+      setValidatingId(null);
     }
   };
 
@@ -98,6 +116,7 @@ export default function ComplimentaryWidget({ complimentaryTickets, onRequest, o
                 <div>
                   <p className="text-sm font-bold">{ticket.customers?.name}</p>
                   <p className="text-[10px] text-white/40 uppercase tracking-widest">{ticket.customers?.cpf}</p>
+                  <p className="text-[10px] text-blue-400 mt-0.5 uppercase tracking-widest">Cortesia de: {ticket.requested_by_user?.name || 'Sistema'}</p>
                   {ticket.notes && <p className="text-[10px] text-white/30 italic mt-1">&quot;{ticket.notes}&quot;</p>}
                 </div>
                 <div className="flex flex-col items-end">
@@ -130,10 +149,24 @@ export default function ComplimentaryWidget({ complimentaryTickets, onRequest, o
                   </button>
                 </div>
               )}
+
+              {ticket.status === 'approved' && onValidateEntry && (
+                <div className="mt-3 pt-3 border-t border-white/5">
+                  <button 
+                    onClick={() => handleValidateEntry(ticket)}
+                    disabled={validatingId === ticket.id}
+                    className="w-full bg-[#D4AF37]/20 text-[#D4AF37] hover:bg-[#D4AF37] hover:text-black transition-all rounded-lg py-2 text-[10px] font-black uppercase tracking-widest flex justify-center items-center gap-2 disabled:opacity-50"
+                  >
+                    {validatingId === ticket.id ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle size={12} />}
+                    {validatingId === ticket.id ? 'Validando...' : 'Validar Entrada'}
+                  </button>
+                </div>
+              )}
             </div>
           ))
         )}
       </div>
+      <CustomAlertDialog {...alertProps} />
     </div>
   );
 }

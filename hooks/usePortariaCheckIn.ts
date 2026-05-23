@@ -10,9 +10,10 @@ import {
 } from '@/src/services/reservations';
 import { fetchBlacklistEntries } from '@/src/services/blacklist';
 import { fetchTicketBatches } from '@/src/services/ticketing';
-import { requestComplimentaryTicket, fetchComplimentaryTickets, updateComplimentaryStatus } from '@/src/services/complimentary';
+import { requestComplimentaryTicket, fetchComplimentaryTickets, updateComplimentaryStatus, validateComplimentaryEntry } from '@/src/services/complimentary';
 import { fetchCamarotesWithOccupation, registerCamaroteEntry, registerExtraCamaroteEntry } from '@/src/services/camarotes';
 import { useCustomAlert } from './use-custom-alert';
+import { getPortoVelhoTime } from '@/lib/date-utils';
 
 export type Reservation = any;
 export type Blacklist = any;
@@ -39,6 +40,7 @@ export function usePortariaCheckIn() {
   
   // Modal & Alert states
   const [showQuickAdd, setShowQuickAdd] = useState(false);
+  const [quickAddInitialData, setQuickAddInitialData] = useState<any>(null);
   const [blacklistAlert, setBlacklistAlert] = useState<Blacklist | null>(null);
   const [duplicateAlert, setDuplicateAlert] = useState<any | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -48,12 +50,61 @@ export function usePortariaCheckIn() {
 
   const supabase = createClient();
   const router = useRouter();
-  const [selectedDate, setSelectedDate] = useState<string>(format(startOfToday(), 'yyyy-MM-dd'));
+  
+  const [selectedEvent, setSelectedEvent] = useState<any>(null);
+  const [showEventSelector, setShowEventSelector] = useState(false);
+  const [availableEvents, setAvailableEvents] = useState<any[]>([]);
+
+  const selectedDate = selectedEvent?.event_date || format(startOfToday(), 'yyyy-MM-dd');
   const todayBrl = selectedDate.split('-').reverse().join('/');
 
   const { showAlert, alertProps } = useCustomAlert();
 
+  useEffect(() => {
+    const initEvent = () => {
+      const storedEvent = localStorage.getItem('portaria_selected_event');
+      if (storedEvent) {
+        try {
+          const parsed = JSON.parse(storedEvent);
+          if (parsed && parsed.event_date) {
+            setSelectedEvent(parsed);
+          } else {
+            setShowEventSelector(true);
+          }
+        } catch {
+          setShowEventSelector(true);
+        }
+      } else {
+        setShowEventSelector(true);
+      }
+    };
+    initEvent();
+
+    const todayString = getPortoVelhoTime().split('T')[0];
+    supabase
+      .from('events')
+      .select('*')
+      .gte('event_date', todayString)
+      .order('event_date', { ascending: true })
+      .limit(10)
+      .then(({data}) => {
+        if (data) setAvailableEvents(data);
+      });
+  }, [supabase]);
+
+  const handleSelectEvent = (ev: any) => {
+    setSelectedEvent(ev);
+    setEvent(ev);
+    localStorage.setItem('portaria_selected_event', JSON.stringify(ev));
+    setShowEventSelector(false);
+  };
+
+  const handleChangeEvent = () => {
+    setShowEventSelector(true);
+  };
+
   const fetchTodaysData = async (silent = false) => {
+    if (!selectedEvent) return;
     if (!silent) setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -82,15 +133,16 @@ export function usePortariaCheckIn() {
       const cams = await fetchCamarotesWithOccupation(selectedDate);
       setCamarotes(cams);
 
-      // Fetch event
+      // Fetch event just to be safe if it updated
       const { data: evData } = await supabase.from('events').select('*').eq('event_date', selectedDate).maybeSingle();
       if (evData) {
         setEvent(evData);
+        // Do not override selectedEvent so we don't cause loops, but keep event fresh
       } else {
-        setEvent(null);
+        setEvent(selectedEvent);
       }
     } catch (err: any) {
-      console.error('Error fetching today\'s portaria data:', err);
+      console.error('Error fetching portaria data:', err);
       showAlert('Erro de Conexão', 'Não foi possível sincronizar os dados da portaria.', 'error');
     } finally {
       if (!silent) setLoading(false);
@@ -98,6 +150,7 @@ export function usePortariaCheckIn() {
   };
 
   useEffect(() => {
+    if (!selectedEvent) return;
     const channel = supabase.channel('portaria-sync')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'reservations' }, () => fetchTodaysData(true))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'complimentary_tickets' }, () => fetchTodaysData(true))
@@ -110,26 +163,27 @@ export function usePortariaCheckIn() {
       supabase.removeChannel(channel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDate]);
+  }, [selectedEvent]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    fetchTodaysData();
+    if (selectedEvent) fetchTodaysData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDate]);
+  }, [selectedEvent]);
 
   const handleSearch = (term: string) => {
     setSearchTerm(term);
-    if (term.length < 3) {
+    const cleanedTerm = term.trim();
+    if (cleanedTerm.length < 3) {
       setSearchResult(null);
       setIsBlacklisted(null);
       return;
     }
 
-    const normTerm = normalize(term);
+    const normTerm = normalize(cleanedTerm);
 
     const barred = blacklist.find(b =>
-      b.cpf === term ||
+      b.cpf === cleanedTerm ||
       normalize(b.name).includes(normTerm)
     );
     if (barred) {
@@ -138,30 +192,13 @@ export function usePortariaCheckIn() {
       setIsBlacklisted(null);
     }
 
+    const cleanTermNumbers = cleanedTerm.replace(/\D/g, '');
     const found = reservations.find(r =>
-      (r.customers?.cpf || r.cpf) === term ||
-      (r.customers?.whatsapp || r.whatsapp)?.includes(term) ||
+      (cleanTermNumbers && (r.customers?.cpf || r.cpf)?.replace(/\D/g, '') === cleanTermNumbers) ||
+      (r.customers?.whatsapp || r.whatsapp)?.includes(cleanedTerm) ||
       normalize(r.customers?.name || r.name || '').includes(normTerm)
     );
     setSearchResult(found || null);
-  };
-
-  const getPortoVelhoTime = () => {
-    const now = new Date();
-    const formatter = new Intl.DateTimeFormat('pt-BR', {
-      timeZone: 'America/Porto_Velho',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false
-    });
-    
-    const parts = formatter.formatToParts(now);
-    const getValue = (type: string) => parts.find(p => p.type === type)?.value || '';
-    return `${getValue('year')}-${getValue('month')}-${getValue('day')} ${getValue('hour')}:${getValue('minute')}:${getValue('second')}`;
   };
 
   const toggleCheckInWithPhoto = async (id: string, currentStatus: string | null, photoBase64: string | null = null) => {
@@ -198,7 +235,28 @@ export function usePortariaCheckIn() {
       }
     } catch (err: any) {
       console.error('Error performing check-in status update:', err);
-      showAlert('Falha no Check-in', 'Erro ao atualizar o status no banco de dados.', 'error');
+      const errMsg = err.message || 'Erro ao atualizar o status no banco de dados.';
+      
+      if (errMsg.toLowerCase().includes('expirado') || errMsg.toLowerCase().includes('limite da lista')) {
+        const res = reservations.find(r => r.id === id);
+        if (res) {
+          setQuickAddInitialData({
+            cpf: res.cpf || res.customers?.cpf || '',
+            name: res.name || res.customers?.name || '',
+            whatsapp: res.whatsapp || res.customers?.whatsapp || '',
+            birth_date: res.birth_date || res.customers?.birth_date || '',
+            photo: res.photo || res.customers?.photo || null
+          });
+        }
+        
+        // Show an informative warning and automatically open the Quick Add Modal for selling a bracelet
+        showAlert('Horário Expirado', `${errMsg} Redirecionando para venda de pulseira...`, 'warning');
+        setTimeout(() => {
+          setShowQuickAdd(true);
+        }, 1500); // Small delay to read the alert before opening modal
+      } else {
+        showAlert('Falha no Check-in', errMsg, 'error');
+      }
     }
   };
 
@@ -302,12 +360,13 @@ export function usePortariaCheckIn() {
       if (!checkTimeRange(r.entered_at)) return false;
     }
 
-    if (!searchTerm) return true;
-    const normTerm = normalize(searchTerm);
+    if (!searchTerm.trim()) return true;
+    const cleanedSearchTerm = searchTerm.trim();
+    const normTerm = normalize(cleanedSearchTerm);
     return (
       normalize(r.name || '').includes(normTerm) ||
-      r.cpf?.replace(/\D/g, '').includes(searchTerm.replace(/\D/g, '')) ||
-      r.whatsapp?.includes(searchTerm)
+      r.cpf?.replace(/\D/g, '').includes(cleanedSearchTerm.replace(/\D/g, '')) ||
+      r.whatsapp?.includes(cleanedSearchTerm)
     );
   });
 
@@ -353,6 +412,8 @@ export function usePortariaCheckIn() {
     isBlacklisted,
     showQuickAdd,
     setShowQuickAdd,
+    quickAddInitialData,
+    setQuickAddInitialData,
     blacklistAlert,
     setBlacklistAlert,
     duplicateAlert,
@@ -383,13 +444,18 @@ export function usePortariaCheckIn() {
     fetchTodaysData,
     updateCustomerPhotoLocally,
     selectedDate,
-    setSelectedDate,
     typeFilter,
     setTypeFilter,
     requestComplimentaryTicket: async (params: any) => { const res = await requestComplimentaryTicket(params); fetchTodaysData(true); return res; },
     updateComplimentaryStatus: async (id: string, status: 'approved' | 'rejected') => { const res = await updateComplimentaryStatus(id, status); fetchTodaysData(true); return res; },
+    validateComplimentaryEntry: async (customerId: string, eventDate: string) => { const res = await validateComplimentaryEntry(customerId, eventDate); fetchTodaysData(true); return res; },
     registerCamaroteEntry: async (params: any) => { const res = await registerCamaroteEntry(params); fetchTodaysData(true); return res; },
     registerExtraCamaroteEntry: async (params: any) => { const res = await registerExtraCamaroteEntry(params); fetchTodaysData(true); return res; },
-    event
+    event,
+    selectedEvent,
+    showEventSelector,
+    availableEvents,
+    handleSelectEvent,
+    handleChangeEvent
   };
 }

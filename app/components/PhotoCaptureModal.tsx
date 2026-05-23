@@ -31,10 +31,15 @@ export default function PhotoCaptureModal({
     
     setIsUploading(true);
     try {
-      // Como o Cadastro Rápido salva direto em base64, faremos o mesmo
+      let finalPhotoUrl = photo;
+      if (photo.startsWith('data:image')) {
+        const { uploadCustomerPhoto } = await import('@/src/services/storage');
+        finalPhotoUrl = await uploadCustomerPhoto(photo, customerId);
+      }
+
       const { error } = await supabase
         .from('customers')
-        .update({ photo })
+        .update({ photo: finalPhotoUrl })
         .eq('id', customerId);
 
       if (error) throw error;
@@ -42,10 +47,10 @@ export default function PhotoCaptureModal({
       // Update the reservations table as well since it has a legacy photo column
       await supabase
         .from('reservations')
-        .update({ photo })
+        .update({ photo: finalPhotoUrl })
         .eq('customer_id', customerId);
         
-      onSuccess(photo);
+      onSuccess(finalPhotoUrl);
       onClose();
     } catch (error: any) {
       console.error(error);

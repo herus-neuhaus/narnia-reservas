@@ -68,7 +68,7 @@ export default function PortariaList({
                   <div className="flex gap-3 mt-1 items-center">
                     <span className="text-[10px] font-bold uppercase tracking-tighter text-white/30">{res.cpf || 'Sem CPF'}</span>
                     <span className="text-[10px] font-bold uppercase tracking-tighter text-[#D4AF37]/60">
-                      {res.type === 'camarote' ? 'VIP' : res.type === 'pulseira' ? 'Pulseira' : res.type === 'mesa' ? 'Mesa' : 'Lista'} {res.location_id}
+                      {res.type === 'camarote' ? 'VIP' : res.type === 'pulseira' ? 'Pulseira' : res.type === 'mesa' ? 'Mesa' : res.type === 'cortesia' ? 'Cortesia' : 'Lista'} {res.location_id}
                     </span>
                     {res.check_in_status === 'entered' && res.entered_at && (
                       <span className="text-[10px] font-bold uppercase tracking-tighter text-green-500/80 flex items-center gap-0.5">

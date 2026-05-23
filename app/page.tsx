@@ -25,56 +25,41 @@ import ReservationLanding from './components/ReservationLanding';
 import ReservationCheck from './components/ReservationCheck';
 import ReservationSuccess from './components/ReservationSuccess';
 import CustomAlertDialog from '@/app/components/CustomAlertDialog';
-import { useReservation } from '@/hooks/useReservation';
+import { useReservationForm } from '@/hooks/useReservationForm';
+import { useReservationQueries } from '@/hooks/useReservationQueries';
+import { useReservationActions } from '@/hooks/useReservationActions';
 import { getCustomerByCpf } from '@/src/services/reservations';
 import { cpf as cpfValidator } from 'cpf-cnpj-validator';
+import { formatCPF, formatPhone } from '@/lib/utils';
+import { useCustomAlert } from '@/hooks/use-custom-alert';
 
 export default function NarniaClubPortal() {
+  const { showAlert, alertProps } = useCustomAlert();
+  const formProps = useReservationForm();
+  const queryProps = useReservationQueries(formProps.date, formProps.portalMode, showAlert);
+  const actionProps = useReservationActions(formProps, showAlert);
+
+  const resetAll = () => {
+    formProps.resetForm();
+    actionProps.setIsSuccess(false);
+    queryProps.setReservedLocations([]);
+  };
+
   const {
-    portalMode,
-    setPortalMode,
-    activeStep,
-    setActiveStep,
-    date,
-    setDate,
-    guests,
-    setGuests,
-    time,
-    setTime,
-    notes,
-    setNotes,
-    locationId,
-    setLocationId,
-    formData,
-    setFormData,
-    formErrors,
-    setFormErrors,
-    isCpfLoading,
-    setIsCpfLoading,
-    isSubmitting,
-    isSuccess,
-    fullyBookedDates,
-    reservedLocations,
-    searchCpf,
-    setSearchCpf,
-    userReservations,
-    isSearching,
-    hasSearched,
-    blacklistAlert,
-    setBlacklistAlert,
-    policyAccepted,
-    setPolicyAccepted,
-    events,
-    loadingEvents,
-    handleSearch,
-    handleModeChange,
-    handleSubmit,
-    resetAll,
-    formatCPF,
-    formatPhone,
-    alertProps,
-    showAlert
-  } = useReservation();
+    portalMode, setPortalMode, activeStep, setActiveStep, date, setDate,
+    guests, setGuests, time, setTime, notes, setNotes, locationId, setLocationId,
+    formData, setFormData, formErrors, setFormErrors, isCpfLoading, setIsCpfLoading,
+    searchCpf, setSearchCpf, policyAccepted, setPolicyAccepted, handleModeChange
+  } = formProps;
+
+  const {
+    fullyBookedDates, reservedLocations, userReservations, isSearching, hasSearched,
+    events, loadingEvents, handleSearch
+  } = queryProps;
+
+  const {
+    isSubmitting, isSuccess, blacklistAlert, setBlacklistAlert, handleSubmit
+  } = actionProps;
 
   const WHATSAPP_NUMBER = "5569999798553";
 
@@ -328,30 +313,18 @@ export default function NarniaClubPortal() {
 
             <button 
               onClick={() => {
-                const errors: Record<string, string> = {};
-                if (!formData.name.trim()) errors.name = 'Nome é obrigatório';
-                if (!formData.cpf.trim()) {
-                  errors.cpf = 'CPF é obrigatório';
-                } else if (!cpfValidator.isValid(formData.cpf)) {
-                  errors.cpf = 'CPF inválido';
-                }
-                if (!formData.birth_date || formData.birth_date.length !== 10) {
-                  errors.birth_date = 'Data de nascimento inválida';
-                } else {
-                  const age = differenceInYears(new Date(), parse(formData.birth_date, 'dd/MM/yyyy', new Date()));
-                  if (age < 18) {
-                    errors.birth_date = 'Apenas maiores de 18 anos podem reservar';
-                  }
-                }
-                if (!formData.whatsapp.trim()) {
-                  errors.whatsapp = 'WhatsApp é obrigatório';
-                } else if (formData.whatsapp.length < 14) {
-                  errors.whatsapp = 'Telefone inválido';
-                }
-
-                if (Object.keys(errors).length === 0) {
+                const { reservationSchema } = require('@/src/schemas/reservationSchema');
+                const result = reservationSchema.safeParse(formData);
+                
+                if (result.success) {
+                  setFormErrors({});
                   setActiveStep(6);
                 } else {
+                  const errors: Record<string, string> = {};
+                  result.error.issues.forEach((issue: any) => {
+                    const path = issue.path[0] as string;
+                    if (!errors[path]) errors[path] = issue.message;
+                  });
                   setFormErrors(errors);
                 }
               }}

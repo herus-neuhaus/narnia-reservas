@@ -2,6 +2,8 @@
 
 import React, { useState } from 'react';
 import { GlassWater, Users, PlusCircle, UserPlus, AlertTriangle } from 'lucide-react';
+import CustomAlertDialog from '@/app/components/CustomAlertDialog';
+import { useCustomAlert } from '@/hooks/use-custom-alert';
 
 interface CamaroteWidgetProps {
   camarotes: any[];
@@ -11,30 +13,31 @@ interface CamaroteWidgetProps {
 }
 
 export default function CamaroteWidget({ camarotes, isAdmin, onRegisterEntry, onRegisterExtra }: CamaroteWidgetProps) {
+  const { showAlert, alertProps } = useCustomAlert();
   const [selectedCamarote, setSelectedCamarote] = useState<string | null>(null);
   const [cpf, setCpf] = useState('');
   const [name, setName] = useState('');
 
   const handleEntry = async (isExtra: boolean) => {
     if (!selectedCamarote || !cpf || !name) {
-      alert('Selecione o camarote e preencha CPF e Nome do cliente');
+      showAlert('Atenção', 'Selecione o camarote e preencha CPF e Nome do cliente', 'warning');
       return;
     }
     try {
       if (isExtra) {
         if (!isAdmin) {
-          alert('Apenas gerentes podem liberar entrada extra.');
+          showAlert('Acesso Negado', 'Apenas gerentes podem liberar entrada extra.', 'error');
           return;
         }
         await onRegisterExtra({ camaroteId: selectedCamarote, cpf, name });
       } else {
         await onRegisterEntry({ camaroteId: selectedCamarote, cpf, name });
       }
-      alert('Entrada registrada com sucesso!');
+      showAlert('Sucesso', 'Entrada registrada com sucesso!', 'success');
       setCpf('');
       setName('');
     } catch (err: any) {
-      alert(err.message || 'Erro ao registrar entrada');
+      showAlert('Erro', err.message || 'Erro ao registrar entrada', 'error');
     }
   };
 
@@ -138,6 +141,7 @@ export default function CamaroteWidget({ camarotes, isAdmin, onRegisterEntry, on
           })
         )}
       </div>
+      <CustomAlertDialog {...alertProps} />
     </div>
   );
 }

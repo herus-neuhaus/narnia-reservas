@@ -92,3 +92,19 @@ export async function updateComplimentaryNotes(ticketId: string, notes: string) 
 
   if (error) throw new Error(`Erro ao atualizar cortesia: ${error.message}`);
 }
+
+export async function validateComplimentaryEntry(customerId: string, eventDate: string) {
+  const { data, error } = await supabase.rpc('validate_complimentary_entry', {
+    p_customer_id: customerId,
+    p_event_date: eventDate
+  });
+
+  if (error) throw new Error(`Erro ao validar entrada: ${error.message}`);
+  
+  const parsed = typeof data === 'string' ? JSON.parse(data) : data;
+  if (parsed && parsed.success === false) {
+    throw new Error(parsed.message || 'Erro desconhecido ao validar entrada.');
+  }
+
+  return parsed;
+}

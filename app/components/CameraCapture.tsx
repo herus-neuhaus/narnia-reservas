@@ -86,16 +86,36 @@ export default function CameraCapture({ onPhotoCaptured, initialPhoto = null }: 
 
     const video = videoRef.current;
     const canvas = document.createElement('canvas');
-    canvas.width = video.videoWidth || 640;
-    canvas.height = video.videoHeight || 480;
+    
+    // Aggressive compression: max 400x400
+    const MAX_WIDTH = 400;
+    const MAX_HEIGHT = 400;
+    
+    let width = video.videoWidth || 640;
+    let height = video.videoHeight || 480;
+
+    if (width > height) {
+      if (width > MAX_WIDTH) {
+        height *= MAX_WIDTH / width;
+        width = MAX_WIDTH;
+      }
+    } else {
+      if (height > MAX_HEIGHT) {
+        width *= MAX_HEIGHT / height;
+        height = MAX_HEIGHT;
+      }
+    }
+
+    canvas.width = width;
+    canvas.height = height;
 
     const ctx = canvas.getContext('2d');
     if (ctx) {
-      // Draw the video frame to the canvas
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      // Draw the video frame to the canvas with the new dimensions
+      ctx.drawImage(video, 0, 0, width, height);
       
-      // Compress to JPEG with 0.8 quality to keep DB size light
-      const base64 = canvas.toDataURL('image/jpeg', 0.8);
+      // Compress to WebP with 0.6 quality to ensure it's < 50kb
+      const base64 = canvas.toDataURL('image/webp', 0.6);
       setPhoto(base64);
       onPhotoCaptured(base64);
       stopCamera();

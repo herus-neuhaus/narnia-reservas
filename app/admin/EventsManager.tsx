@@ -23,6 +23,11 @@ export default function EventsManager() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [overviewEvent, setOverviewEvent] = useState<EventRow | null>(null);
 
+  // States for inline editing of start time
+  const [editingStartTimeId, setEditingStartTimeId] = useState<string | null>(null);
+  const [editingStartTime, setEditingStartTime] = useState<string>('22:00');
+  const [isUpdatingStartTime, setIsUpdatingStartTime] = useState<boolean>(false);
+
   // States for inline editing of list limit time
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingTime, setEditingTime] = useState<string>('23:30');
@@ -161,18 +166,49 @@ export default function EventsManager() {
     setIsUpdatingTime(true);
     try {
       const formattedTime = editingTime.includes(':') ? editingTime : '23:30';
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('events')
         .update({ list_limit_time: formattedTime })
-        .eq('id', id);
+        .eq('id', id)
+        .select();
 
       if (error) throw error;
+      if (!data || data.length === 0) throw new Error('Não foi possível atualizar (permissão negada ou evento não encontrado).');
+      
       setEditingId(null);
-      fetchEvents();
+      
+      // Update local state directly
+      setEvents(prev => prev.map(ev => ev.id === id ? { ...ev, list_limit_time: formattedTime } : ev));
     } catch (error: any) {
-      alert('Erro ao atualizar horário limite: ' + error.message);
+      console.error('Erro ao atualizar horário limite:', error);
+      alert('Erro ao atualizar horário limite: ' + (error.message || 'Erro desconhecido.'));
     } finally {
       setIsUpdatingTime(false);
+    }
+  };
+
+  const handleSaveStartTime = async (id: string) => {
+    setIsUpdatingStartTime(true);
+    try {
+      const formattedTime = editingStartTime.includes(':') ? editingStartTime : '22:00';
+      const { data, error } = await supabase
+        .from('events')
+        .update({ start_time: formattedTime })
+        .eq('id', id)
+        .select();
+
+      if (error) throw error;
+      if (!data || data.length === 0) throw new Error('Não foi possível atualizar (permissão negada ou evento não encontrado).');
+      
+      setEditingStartTimeId(null);
+      
+      // Update local state directly
+      setEvents(prev => prev.map(ev => ev.id === id ? { ...ev, start_time: formattedTime } : ev));
+    } catch (error: any) {
+      console.error('Erro ao atualizar horário de início:', error);
+      alert('Erro ao atualizar horário de início: ' + (error.message || 'Erro desconhecido.'));
+    } finally {
+      setIsUpdatingStartTime(false);
     }
   };
 
@@ -183,16 +219,22 @@ export default function EventsManager() {
       if (capVal !== null && (isNaN(capVal) || capVal < 0)) {
         throw new Error('Capacidade deve ser um número maior ou igual a zero.');
       }
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('events')
         .update({ list_limit_capacity: capVal })
-        .eq('id', id);
+        .eq('id', id)
+        .select();
 
       if (error) throw error;
+      if (!data || data.length === 0) throw new Error('Não foi possível atualizar (permissão negada ou evento não encontrado).');
+      
       setEditingCapacityId(null);
-      fetchEvents();
+      
+      // Update local state directly
+      setEvents(prev => prev.map(ev => ev.id === id ? { ...ev, list_limit_capacity: capVal } : ev));
     } catch (error: any) {
-      alert('Erro ao atualizar limite de lista: ' + error.message);
+      console.error('Erro ao atualizar limite de lista:', error);
+      alert('Erro ao atualizar limite de lista: ' + (error.message || 'Erro desconhecido.'));
     } finally {
       setIsUpdatingCapacity(false);
     }
@@ -201,17 +243,26 @@ export default function EventsManager() {
   const handleSaveVisibleFrom = async (id: string) => {
     setIsUpdatingVisibleFrom(true);
     try {
-      const val = editingVisibleFrom ? new Date(editingVisibleFrom).toISOString() : null;
-      const { error } = await supabase
+      // Instead of relying on local browser time conversions which might shift the date,
+      // we store the raw datetime-local string (YYYY-MM-DDTHH:mm) assuming the database is expecting a timezone or implicit local.
+      const val = editingVisibleFrom ? editingVisibleFrom : null;
+      
+      const { data, error } = await supabase
         .from('events')
         .update({ visible_from: val })
-        .eq('id', id);
+        .eq('id', id)
+        .select();
 
       if (error) throw error;
+      if (!data || data.length === 0) throw new Error('Não foi possível atualizar (permissão negada ou evento não encontrado).');
+      
       setEditingVisibleFromId(null);
-      fetchEvents();
+      
+      // Update local state directly
+      setEvents(prev => prev.map(ev => ev.id === id ? { ...ev, visible_from: val } : ev));
     } catch (error: any) {
-      alert('Erro ao atualizar data de liberação: ' + error.message);
+      console.error('Erro ao atualizar data de liberação:', error);
+      alert('Erro ao atualizar data de liberação: ' + (error.message || 'Erro desconhecido.'));
     } finally {
       setIsUpdatingVisibleFrom(false);
     }
@@ -442,9 +493,47 @@ export default function EventsManager() {
                       <Clock size={14} className="text-[#D4AF37]" />
                       <span className="text-[10px] font-bold uppercase tracking-widest text-white/40">Início do Evento</span>
                     </div>
-                    <span className="text-sm font-black text-white">
-                      {event.start_time ? event.start_time.substring(0, 5) : '22:00'}
-                    </span>
+                    {editingStartTimeId === event.id ? (
+                      <div className="flex items-center gap-1.5 animate-in fade-in duration-200">
+                        <input 
+                          type="time" 
+                          value={editingStartTime}
+                          onChange={e => setEditingStartTime(e.target.value)}
+                          className="px-3 py-1.5 bg-black border border-white/20 rounded-xl text-xs font-bold text-white outline-none focus:border-[#D4AF37] w-24"
+                        />
+                        <button 
+                          onClick={() => handleSaveStartTime(event.id)}
+                          disabled={isUpdatingStartTime}
+                          className="p-2 bg-[#D4AF37] text-black rounded-xl hover:bg-[#b8962f] active:scale-95 transition-all"
+                          title="Salvar"
+                        >
+                          {isUpdatingStartTime ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check size={12} />}
+                        </button>
+                        <button 
+                          onClick={() => setEditingStartTimeId(null)}
+                          className="p-2 bg-white/5 hover:bg-white/10 text-white rounded-xl active:scale-95 transition-all border border-white/10"
+                          title="Cancelar"
+                        >
+                          <X size={12} />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-black text-white">
+                          {event.start_time ? event.start_time.substring(0, 5) : '22:00'}
+                        </span>
+                        <button 
+                          onClick={() => {
+                            setEditingStartTimeId(event.id);
+                            setEditingStartTime(event.start_time ? event.start_time.substring(0, 5) : '22:00');
+                          }}
+                          className="p-1.5 bg-white/5 hover:bg-[#D4AF37] hover:text-black text-white/60 rounded-lg transition-all border border-white/10"
+                          title="Editar Horário de Início"
+                        >
+                          <Edit2 size={10} />
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   {/* Visible From Section */}
