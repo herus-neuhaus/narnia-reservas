@@ -15,24 +15,9 @@ export const getPortoVelhoTime = () => {
 export const isCortesiaExpired = (event: any, selectedDate: string) => {
   if (!event || !event.list_limit_time) return false;
   
-  const currentPvTime = getPortoVelhoTime();
-  const [currentDate, currentTime] = currentPvTime.split(' ');
-  const limitTime = event.list_limit_time;
+  const limitDate = new Date(event.list_limit_time);
+  if (isNaN(limitDate.getTime())) return false;
   
-  const [limitH] = limitTime.split(':').map(Number);
-  const limitDayOffset = limitH < 12 ? 1 : 0;
-  
-  const buildAbsolute = (dateStr: string, timeStr: string, dayOffset: number) => {
-     const d = new Date(dateStr + 'T12:00:00Z');
-     d.setDate(d.getDate() + dayOffset);
-     const yyyy = d.getFullYear();
-     const mm = String(d.getMonth() + 1).padStart(2, '0');
-     const dd = String(d.getDate()).padStart(2, '0');
-     return `${yyyy}${mm}${dd}${timeStr.replace(/:/g, '')}`;
-  };
-  
-  const currentAbs = currentDate.replace(/-/g, '') + currentTime.replace(/:/g, '');
-  const limitAbs = buildAbsolute(selectedDate, limitTime, limitDayOffset);
-  
-  return currentAbs > limitAbs;
+  const now = new Date();
+  return now > limitDate;
 };

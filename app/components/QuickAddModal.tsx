@@ -466,7 +466,7 @@ export default function QuickAddModal({
                         ? 'bg-[#D4AF37] border-[#D4AF37] text-black shadow-lg shadow-[#D4AF37]/10' 
                         : 'bg-black border-white/10 text-white/40 hover:text-white/60 hover:bg-white/5'
                   }`}
-                  title={t.disabled ? `Horário de cortesia encerrou (${event?.list_limit_time})` : ''}
+                  title={t.disabled ? `Horário de cortesia encerrou (${event?.list_limit_time ? format(parseISO(event.list_limit_time), 'dd/MM HH:mm') : ''})` : ''}
                 >
                   {t.label}
                 </button>
@@ -474,7 +474,7 @@ export default function QuickAddModal({
             </div>
             {isCortesiaExpired(event, selectedDate) && (
               <p className="text-[10px] text-red-500/80 mt-2 ml-4 italic">
-                O horário de cortesia ({event?.list_limit_time}) já encerrou. Utilize Pulseira.
+                O horário de cortesia ({event?.list_limit_time ? format(parseISO(event.list_limit_time), 'dd/MM HH:mm') : ''}) já encerrou. Utilize Pulseira.
               </p>
             )}
           </div>

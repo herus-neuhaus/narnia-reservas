@@ -48,7 +48,7 @@ export default function EventsManager() {
     event_date: '',
     description: '',
     start_time: '22:00',
-    list_limit_time: '23:30',
+    list_limit_time: '',
     list_limit_capacity: '',
     visible_from: '',
     banner_url: '',
@@ -129,7 +129,7 @@ export default function EventsManager() {
           description: formData.description,
           start_time: formData.start_time || '22:00',
           list_limit_capacity: formData.list_limit_capacity || '0',
-          list_limit_time: formData.list_limit_time || '23:30',
+          list_limit_time: formData.list_limit_time ? new Date(formData.list_limit_time).toISOString() : null,
           banner_url: formData.banner_url,
           visible_from: formData.visible_from ? new Date(formData.visible_from).toISOString() : null,
           available_camarotes: formData.available_camarotes
@@ -165,7 +165,7 @@ export default function EventsManager() {
   const handleSaveTime = async (id: string) => {
     setIsUpdatingTime(true);
     try {
-      const formattedTime = editingTime.includes(':') ? editingTime : '23:30';
+      const formattedTime = new Date(editingTime).toISOString();
       const { data, error } = await supabase
         .from('events')
         .update({ list_limit_time: formattedTime })
@@ -333,7 +333,7 @@ export default function EventsManager() {
             <div>
               <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400 ml-4 mb-1 block">Limite da Lista</label>
               <input 
-                type="time" 
+                type="datetime-local" 
                 value={formData.list_limit_time}
                 onChange={e => setFormData({...formData, list_limit_time: e.target.value})}
                 className="w-full px-6 py-4 bg-[#0d0d0d] border border-zinc-800 rounded-2xl outline-none focus:border-[#d4af37] focus:ring-1 focus:ring-[#d4af37] transition-all text-white font-medium"
@@ -594,10 +594,10 @@ export default function EventsManager() {
                     {editingId === event.id ? (
                       <div className="flex items-center gap-1.5 animate-in fade-in duration-200">
                         <input 
-                          type="time" 
+                          type="datetime-local" 
                           value={editingTime}
                           onChange={e => setEditingTime(e.target.value)}
-                          className="px-3 py-1.5 bg-black border border-white/20 rounded-xl text-xs font-bold text-white outline-none focus:border-[#D4AF37] w-24"
+                          className="px-3 py-1.5 bg-black border border-white/20 rounded-xl text-xs font-bold text-white outline-none focus:border-[#D4AF37] w-36"
                         />
                         <button 
                           onClick={() => handleSaveTime(event.id)}
@@ -618,12 +618,12 @@ export default function EventsManager() {
                     ) : (
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-black text-white">
-                          {event.list_limit_time ? event.list_limit_time.substring(0, 5) : '23:30'}
+                          {event.list_limit_time ? format(parseISO(event.list_limit_time), 'dd/MM HH:mm') : '--:--'}
                         </span>
                         <button 
                           onClick={() => {
                             setEditingId(event.id);
-                            setEditingTime(event.list_limit_time ? event.list_limit_time.substring(0, 5) : '23:30');
+                            setEditingTime(event.list_limit_time ? event.list_limit_time.slice(0, 16) : '');
                           }}
                           className="p-1.5 bg-white/5 hover:bg-[#D4AF37] hover:text-black text-white/60 rounded-lg transition-all border border-white/10"
                           title="Editar Horário"
