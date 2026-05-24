@@ -126,7 +126,7 @@ export function usePortariaCheckIn() {
       setBlacklist(blData);
 
       // Advanced Ticketing Data
-      const batches = await fetchTicketBatches(selectedDate);
+      const batches = await fetchTicketBatches(selectedEvent ? { eventId: selectedEvent.id } : selectedDate);
       setTicketBatches(batches);
       const compl = await fetchComplimentaryTickets(selectedDate);
       setComplimentaryTickets(compl);

@@ -107,24 +107,28 @@ export default function PortariaDashboard() {
         </div>
       )}
 
-      <div className="flex justify-between items-center px-4 lg:px-8 py-4 bg-[#0A0A0A] border-b border-white/10">
-        <div className="flex items-center gap-4">
+      <div className="flex flex-col sm:flex-row sm:justify-between items-start sm:items-center px-4 lg:px-8 py-4 bg-[#0A0A0A] border-b border-white/10 gap-3 sm:gap-0">
+        <div className="flex items-center justify-between w-full sm:w-auto">
           <h1 className="text-lg lg:text-xl font-black text-[#D4AF37] tracking-widest uppercase">PORTARIA NÁRNIA</h1>
+          <button onClick={handleLogout} className="sm:hidden text-[10px] font-bold text-red-500 uppercase tracking-widest bg-red-500/10 px-3 py-1.5 rounded-lg">Sair</button>
+        </div>
+
+        <div className="flex items-center justify-between w-full sm:w-auto gap-4">
           {selectedEvent && (
-            <div className="hidden sm:flex items-center gap-3 ml-4 pl-4 border-l border-white/10">
-              <span className="text-xs text-white/60">Trabalhando em:</span>
-              <span className="text-sm font-bold text-white">{selectedEvent.name}</span>
+            <div className="flex items-center gap-2 sm:gap-3 flex-1 sm:flex-initial sm:border-l sm:border-white/10 sm:pl-4">
+              <div className="flex flex-col">
+                <span className="text-[9px] sm:text-xs text-white/60">Trabalhando em:</span>
+                <span className="text-[11px] sm:text-sm font-bold text-white truncate max-w-[180px] sm:max-w-[250px]">{selectedEvent.name}</span>
+              </div>
               <button 
                 onClick={handleChangeEvent}
-                className="text-[10px] font-bold uppercase tracking-widest text-[#D4AF37] border border-[#D4AF37]/30 px-3 py-1.5 rounded-lg hover:bg-[#D4AF37]/10 transition-colors"
+                className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-[#D4AF37] border border-[#D4AF37]/30 px-3 py-1.5 rounded-lg hover:bg-[#D4AF37]/10 transition-colors ml-auto sm:ml-0 whitespace-nowrap"
               >
-                Alterar Evento
+                Alterar
               </button>
             </div>
           )}
-        </div>
-        <div className="flex items-center gap-4">
-          <button onClick={handleLogout} className="text-xs font-bold text-red-500 uppercase tracking-widest">Sair</button>
+          <button onClick={handleLogout} className="hidden sm:block text-xs font-bold text-red-500 uppercase tracking-widest">Sair</button>
         </div>
       </div>
 

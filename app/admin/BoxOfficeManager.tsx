@@ -180,10 +180,15 @@ function BatchesTab({ batches, eventDate, eventId, onReload }: any) {
     setIsCreating(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Tem certeza que deseja apagar este lote?')) return;
+  const handleDelete = async (b: any) => {
+    if (b.consumed_quantity > 0) {
+      if (!confirm(`ATENÇÃO: Este lote já tem ${b.consumed_quantity} pulseira(s) vendida(s)! Ao apagar, as vendas serão mantidas no sistema, mas o lote será excluído.\n\nTem certeza ABSOLUTA que deseja FORÇAR a exclusão deste lote?`)) return;
+    } else {
+      if (!confirm('Tem certeza que deseja apagar este lote?')) return;
+    }
+    
     try {
-      await deleteTicketBatch(id);
+      await deleteTicketBatch(b.id);
       onReload();
     } catch (err: any) {
       alert(err.message);
@@ -300,6 +305,11 @@ function BatchesTab({ batches, eventDate, eventId, onReload }: any) {
                   'bg-white/10 text-white/50'
                 }`}>{b.status === 'draft' ? 'Rascunho' : b.status === 'active' ? 'Ativo' : 'Esgotado'}</span>
               </div>
+              {b.events?.name && (
+                <p className="text-[10px] text-[#D4AF37] font-bold uppercase tracking-widest mb-1">
+                  Evento: {b.events.name}
+                </p>
+              )}
               <p className="text-xs text-white/50">
                 {b.consumed_quantity} vendidas de {b.total_quantity} • R$ {b.price.toFixed(2)} un.
               </p>
@@ -325,7 +335,7 @@ function BatchesTab({ batches, eventDate, eventId, onReload }: any) {
                 <button onClick={() => handleEdit(b)} className="px-4 py-2 bg-blue-500/20 text-blue-500 hover:bg-blue-500 hover:text-white rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all">
                   Editar
                 </button>
-                <button onClick={() => handleDelete(b.id)} className="px-4 py-2 bg-red-500/20 text-red-500 hover:bg-red-500 hover:text-white rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all">
+                <button onClick={() => handleDelete(b)} className="px-4 py-2 bg-red-500/20 text-red-500 hover:bg-red-500 hover:text-white rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all">
                   Apagar
                 </button>
               </div>
