@@ -13,7 +13,7 @@ type EventRow = Database['public']['Tables']['events']['Row'] & {
   banner_url?: string | null;
   visible_from?: string | null;
   available_camarotes?: string[] | null;
-  available_mesas?: number | null;
+  available_mesas?: string[] | null;
 };
 
 export default function EventsManager() {
