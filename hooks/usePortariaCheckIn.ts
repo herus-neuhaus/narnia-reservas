@@ -3,7 +3,7 @@ import { useRouter } from 'next/navigation';
 import { format, startOfToday, parseISO, differenceInDays } from 'date-fns';
 import { createClient } from '@/lib/supabase/client';
 import { 
-  fetchTodaysReservations, 
+  fetchEventReservations, 
   updateCheckInStatusWithPhoto, 
   fetchCustomerPhoto, 
   getReservationsByCpfRpc 
@@ -119,18 +119,18 @@ export function usePortariaCheckIn() {
       setIsAdmin(['dono', 'gerente', 'admin'].includes(role) || email === 'narnia@admin.com');
       setIsReceptionist(role === 'receptionist');
 
-      const mappedResData = await fetchTodaysReservations(selectedDate);
+      const mappedResData = await fetchEventReservations(selectedEvent.id);
       const blData = await fetchBlacklistEntries();
 
       setReservations(mappedResData);
       setBlacklist(blData);
 
       // Advanced Ticketing Data
-      const batches = await fetchTicketBatches(selectedEvent ? { eventId: selectedEvent.id } : selectedDate);
+      const batches = await fetchTicketBatches({ eventId: selectedEvent.id });
       setTicketBatches(batches);
-      const compl = await fetchComplimentaryTickets(selectedDate);
+      const compl = await fetchComplimentaryTickets(selectedEvent.id);
       setComplimentaryTickets(compl);
-      const cams = await fetchCamarotesWithOccupation(selectedDate);
+      const cams = await fetchCamarotesWithOccupation(selectedEvent.id);
       setCamarotes(cams);
 
       // Fetch event just to be safe if it updated
@@ -446,11 +446,11 @@ export function usePortariaCheckIn() {
     selectedDate,
     typeFilter,
     setTypeFilter,
-    requestComplimentaryTicket: async (params: any) => { const res = await requestComplimentaryTicket(params); fetchTodaysData(true); return res; },
+    requestComplimentaryTicket: async (params: any) => { const res = await requestComplimentaryTicket({...params, eventId: selectedEvent?.id}); fetchTodaysData(true); return res; },
     updateComplimentaryStatus: async (id: string, status: 'approved' | 'rejected') => { const res = await updateComplimentaryStatus(id, status); fetchTodaysData(true); return res; },
-    validateComplimentaryEntry: async (customerId: string, eventDate: string) => { const res = await validateComplimentaryEntry(customerId, eventDate); fetchTodaysData(true); return res; },
-    registerCamaroteEntry: async (params: any) => { const res = await registerCamaroteEntry(params); fetchTodaysData(true); return res; },
-    registerExtraCamaroteEntry: async (params: any) => { const res = await registerExtraCamaroteEntry(params); fetchTodaysData(true); return res; },
+    validateComplimentaryEntry: async (customerId: string, eventId: string) => { const res = await validateComplimentaryEntry(customerId, eventId); fetchTodaysData(true); return res; },
+    registerCamaroteEntry: async (params: any) => { const res = await registerCamaroteEntry({...params, eventId: selectedEvent?.id}); fetchTodaysData(true); return res; },
+    registerExtraCamaroteEntry: async (params: any) => { const res = await registerExtraCamaroteEntry({...params, eventId: selectedEvent?.id}); fetchTodaysData(true); return res; },
     event,
     selectedEvent,
     showEventSelector,

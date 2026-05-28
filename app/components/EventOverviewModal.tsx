@@ -5,6 +5,7 @@ import { X, Users, LayoutGrid, Gem, ClipboardList, TrendingUp, Loader2, Calendar
 import { createClient } from '@/lib/supabase/client';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import BoxOfficeTabs from '../admin/components/EventDashboard/BoxOfficeTabs';
 
 interface EventOverviewModalProps {
   isOpen: boolean;
@@ -13,6 +14,7 @@ interface EventOverviewModalProps {
 }
 
 export default function EventOverviewModal({ isOpen, onClose, event }: EventOverviewModalProps) {
+  const [activeMainTab, setActiveMainTab] = useState<'overview' | 'boxoffice'>('overview');
   const [loading, setLoading] = useState(true);
   const [reservations, setReservations] = useState<any[]>([]);
   const [stats, setStats] = useState({
@@ -82,7 +84,7 @@ export default function EventOverviewModal({ isOpen, onClose, event }: EventOver
         onClick={onClose}
       />
       
-      <div className="relative z-10 w-full max-w-2xl bg-[#0A0A0A] border border-white/10 rounded-[32px] overflow-hidden shadow-2xl flex flex-col animate-in zoom-in-95 duration-300">
+      <div className="relative z-10 w-full max-w-5xl bg-[#0A0A0A] border border-white/10 rounded-[32px] overflow-hidden shadow-2xl flex flex-col h-full max-h-[90vh] animate-in zoom-in-95 duration-300">
         
         {/* Header with Event Image Background */}
         <div className="relative h-48 sm:h-56 w-full shrink-0">
@@ -122,8 +124,29 @@ export default function EventOverviewModal({ isOpen, onClose, event }: EventOver
         </div>
 
         {/* Content */}
+        <div className="flex bg-[#0A0A0A] border-b border-white/10">
+          <button 
+            onClick={() => setActiveMainTab('overview')}
+            className={`flex-1 py-4 text-xs font-black uppercase tracking-widest transition-all ${
+              activeMainTab === 'overview' ? 'text-[#D4AF37] border-b-2 border-[#D4AF37] bg-white/5' : 'text-white/40 hover:text-white/80 hover:bg-white/5'
+            }`}
+          >
+            Visão Geral
+          </button>
+          <button 
+            onClick={() => setActiveMainTab('boxoffice')}
+            className={`flex-1 py-4 text-xs font-black uppercase tracking-widest transition-all ${
+              activeMainTab === 'boxoffice' ? 'text-[#D4AF37] border-b-2 border-[#D4AF37] bg-white/5' : 'text-white/40 hover:text-white/80 hover:bg-white/5'
+            }`}
+          >
+            Controle do Evento
+          </button>
+        </div>
+
         <div className="p-6 sm:p-8 space-y-8 bg-[#0A0A0A] flex-1 overflow-y-auto custom-scrollbar">
-          {loading ? (
+          {activeMainTab === 'boxoffice' ? (
+            <BoxOfficeTabs event={event} />
+          ) : loading ? (
             <div className="flex flex-col items-center justify-center py-12">
               <Loader2 className="w-8 h-8 text-[#D4AF37] animate-spin mb-4" />
               <p className="text-xs font-bold uppercase tracking-widest text-white/40">Carregando dados...</p>

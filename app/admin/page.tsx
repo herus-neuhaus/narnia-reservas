@@ -26,7 +26,7 @@ import TeamManager from './TeamManager';
 import EventsManager from './EventsManager';
 import ClientsManager from '@/src/features/admin/components/ClientsManager';
 import BlacklistModal from '@/app/components/BlacklistModal';
-import BoxOfficeManager from './BoxOfficeManager';
+
 
 function AdminDashboardContent() {
   const {
@@ -78,7 +78,6 @@ function AdminDashboardContent() {
             {currentView === 'clientes' && 'Base de Clientes'}
             {currentView === 'administradores' && 'Administradores'}
             {currentView === 'recepcionistas' && 'Recepcionistas'}
-            {currentView === 'bilheteria' && 'Bilheteria & Controle'}
           </h2>
           <p className="text-xs font-bold uppercase tracking-widest text-white/30 mt-1">
             {currentView === 'reservations' && `Visualizando ${quickFilter}`}
@@ -87,7 +86,6 @@ function AdminDashboardContent() {
             {currentView === 'clientes' && 'Histórico de Frequência e Restrições por CPF'}
             {currentView === 'administradores' && 'Gerenciamento de Administradores'}
             {currentView === 'recepcionistas' && 'Gerenciamento de Recepcionistas'}
-            {currentView === 'bilheteria' && 'Gestão de Lotes, Cortesias e Camarotes'}
           </p>
         </div>
 
@@ -360,10 +358,6 @@ function AdminDashboardContent() {
         ) : currentView === 'recepcionistas' ? (
           <div className="max-w-7xl mx-auto w-full animate-in fade-in slide-in-from-bottom-4">
             <TeamManager role="receptionist" />
-          </div>
-        ) : currentView === 'bilheteria' ? (
-          <div className="max-w-7xl mx-auto w-full animate-in fade-in slide-in-from-bottom-4">
-            <BoxOfficeManager />
           </div>
         ) : (
           /* Blacklist View */

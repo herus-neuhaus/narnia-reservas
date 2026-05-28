@@ -13,6 +13,7 @@ export async function requestComplimentaryTicket(params: {
   birthDate: string;
   notes: string;
   eventDate: string;
+  eventId?: string;
 }) {
   const { data, error } = await supabase.rpc('request_complimentary_ticket', {
     p_cpf: params.cpf,
@@ -20,7 +21,8 @@ export async function requestComplimentaryTicket(params: {
     p_whatsapp: params.whatsapp,
     p_birth_date: params.birthDate || null,
     p_notes: params.notes,
-    p_event_date: params.eventDate
+    p_event_date: params.eventDate,
+    p_event_id: params.eventId
   });
 
   if (error) throw new Error(`Erro ao solicitar cortesia: ${error.message}`);
@@ -36,7 +38,7 @@ export async function requestComplimentaryTicket(params: {
 /**
  * Lista todas as cortesias solicitadas para a data especificada.
  */
-export async function fetchComplimentaryTickets(eventDate: string) {
+export async function fetchComplimentaryTickets(eventId: string) {
   const { data, error } = await supabase
     .from('complimentary_tickets')
     .select(`
@@ -45,7 +47,7 @@ export async function fetchComplimentaryTickets(eventDate: string) {
       requested_by_user:team_members!complimentary_tickets_requested_by_fkey (id, name),
       approved_by_user:team_members!complimentary_tickets_approved_by_fkey (id, name)
     `)
-    .eq('event_date', eventDate)
+    .eq('event_id', eventId)
     .order('created_at', { ascending: false });
 
   if (error) throw new Error(`Erro ao buscar histórico de cortesias: ${error.message}`);

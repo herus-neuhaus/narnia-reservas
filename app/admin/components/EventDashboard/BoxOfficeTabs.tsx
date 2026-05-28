@@ -22,12 +22,11 @@ import {
   fetchCamarotesWithOccupation, 
   registerExtraCamaroteEntry 
 } from '@/src/services/camarotes';
-import { fetchTodaysReservations } from '@/src/services/reservations';
+import { fetchEventReservations } from '@/src/services/reservations';
 import { createClient } from '@/lib/supabase/client';
 
-export default function BoxOfficeManager({ eventId }: { eventId?: string }) {
+export default function BoxOfficeTabs({ event }: { event: any }) {
   const [activeTab, setActiveTab] = useState<'lotes' | 'cortesias' | 'camarotes' | 'fechamento'>('lotes');
-  const [selectedDate, setSelectedDate] = useState(format(startOfToday(), 'yyyy-MM-dd'));
   const [loading, setLoading] = useState(false);
   const [adminId, setAdminId] = useState<string | null>(null);
 
@@ -46,11 +45,11 @@ export default function BoxOfficeManager({ eventId }: { eventId?: string }) {
       setAdminId(user?.id || null);
 
       const [bData, cData, camData, rData, resData] = await Promise.all([
-        fetchTicketBatches({ eventDate: selectedDate }),
-        fetchComplimentaryTickets(selectedDate),
-        fetchCamarotesWithOccupation(selectedDate),
-        fetchBoxOfficeReport(selectedDate),
-        fetchTodaysReservations(selectedDate)
+        fetchTicketBatches({ eventId: event.id }),
+        fetchComplimentaryTickets(event.id),
+        fetchCamarotesWithOccupation(event.id),
+        fetchBoxOfficeReport(event.id),
+        fetchEventReservations(event.id)
       ]);
       setBatches(bData);
       setComplimentary(cData);
@@ -77,13 +76,13 @@ export default function BoxOfficeManager({ eventId }: { eventId?: string }) {
       supabase.removeChannel(channel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDate]);
+  }, [event.id]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDate]);
+  }, [event.id]);
 
   const tabs: any[] = [
     { id: 'lotes', label: 'Lotes de Pulseira', icon: Ticket },
@@ -95,7 +94,7 @@ export default function BoxOfficeManager({ eventId }: { eventId?: string }) {
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-[#0A0A0A] p-6 rounded-[32px] border border-white/5">
-        <div className="flex gap-2 overflow-x-auto w-full sm:w-auto custom-scrollbar pb-2 sm:pb-0">
+        <div className="flex gap-2 overflow-x-auto w-full custom-scrollbar pb-2 sm:pb-0">
           {tabs.map(tab => (
             <button
               key={tab.id}
@@ -113,12 +112,6 @@ export default function BoxOfficeManager({ eventId }: { eventId?: string }) {
             </button>
           ))}
         </div>
-        <input 
-          type="date"
-          value={selectedDate}
-          onChange={e => setSelectedDate(e.target.value)}
-          className="bg-black border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#D4AF37]/50"
-        />
       </div>
 
       <div className="bg-[#0A0A0A] border border-white/5 rounded-[32px] p-6 sm:p-10 min-h-[500px]">
@@ -129,10 +122,10 @@ export default function BoxOfficeManager({ eventId }: { eventId?: string }) {
           </div>
         ) : (
           <>
-            {activeTab === 'lotes' && <BatchesTab batches={batches} eventDate={selectedDate} eventId={eventId} onReload={loadData} />}
+            {activeTab === 'lotes' && <BatchesTab batches={batches} eventDate={event.event_date} eventId={event.id} onReload={loadData} />}
             {activeTab === 'cortesias' && <ComplimentaryTab complimentary={complimentary} adminId={adminId} onReload={loadData} />}
             {activeTab === 'camarotes' && <CamarotesTab camarotes={camarotes} adminId={adminId} onReload={loadData} />}
-            {activeTab === 'fechamento' && <BoxOfficeTab report={report} eventDate={selectedDate} adminId={adminId} onReload={loadData} batches={batches} complimentary={complimentary} camarotes={camarotes} reservations={reservations} />}
+            {activeTab === 'fechamento' && <BoxOfficeTab report={report} eventDate={event.event_date} eventId={event.id} adminId={adminId} onReload={loadData} batches={batches} complimentary={complimentary} camarotes={camarotes} reservations={reservations} />}
           </>
         )}
       </div>
@@ -494,14 +487,14 @@ function CamarotesTab({ camarotes, adminId, onReload }: any) {
   );
 }
 
-function BoxOfficeTab({ report, eventDate, adminId, onReload, batches, complimentary, camarotes, reservations }: any) {
+function BoxOfficeTab({ report, eventDate, eventId, adminId, onReload, batches, complimentary, camarotes, reservations }: any) {
   const [closing, setClosing] = useState(false);
 
   const handleClose = async () => {
     if (!confirm('ATENÇÃO: Encerrar a bilheteria irá bloquear todos os lotes ativos e gerar o relatório final. Deseja prosseguir?')) return;
     setClosing(true);
     try {
-      await closeBoxOffice(eventDate);
+      await closeBoxOffice(eventId);
       alert('Bilheteria encerrada com sucesso!');
       onReload();
     } catch (err: any) {

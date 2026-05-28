@@ -199,7 +199,7 @@ export default function QuickAddModal({
           whatsapp: quickFormData.whatsapp,
           birthDate: toIsoDate(quickFormData.birth_date),
           photo: finalPhotoUrl,
-          eventDate: selectedDate
+          eventId: event?.id
         });
         
         if (braceletRes?.success) {
@@ -287,24 +287,28 @@ export default function QuickAddModal({
     }
 
     // 2. Inserção da reserva vinculada para outros tipos (Legacy) via RPC atômica
-    const { data, error } = await supabase.rpc('quick_add_portaria_entry', {
+    const { data, error } = await supabase.rpc('create_reservation_v2', {
       p_cpf: quickFormData.cpf,
       p_name: quickFormData.name,
+      p_email: '',
       p_whatsapp: quickFormData.whatsapp,
       p_birth_date: toIsoDate(quickFormData.birth_date),
+      p_date: today,
+      p_time: '22:00',
+      p_guests: 1,
       p_type: quickFormData.type,
       p_location_id: quickFormData.type === 'mesa' ? quickFormData.location_id : null,
-      p_event_date: today,
-      p_photo: finalPhotoUrl
+      p_notes: '',
+      p_expires_at: null,
+      p_event_id: event?.id
     });
 
-    if (!error && data && data.success) {
-      onSuccess(data.data);
+    if (!error) {
+      onSuccess(data);
       setQuickFormData({ name: '', cpf: '', birth_date: '', whatsapp: '', type: 'pulseira', location_id: '', photo: null });
       onClose();
     } else {
-      const isDuplicate = error?.code === '23505' || error?.message?.includes('duplicate key') || 
-                          data?.error_code === 'DUPLICATE_ENTRY';
+      const isDuplicate = error?.code === '23505' || error?.message?.includes('duplicate') || error?.message?.includes('já possui');
       if (isDuplicate) {
         onDuplicate({
           name: quickFormData.name,
@@ -315,7 +319,7 @@ export default function QuickAddModal({
           check_in_status: 'entered'
         });
       } else {
-        showAlert('Erro ao cadastrar', error?.message || data?.message || 'Desconhecido', 'error');
+        showAlert('Erro ao cadastrar', error?.message || (data as any)?.message || 'Desconhecido', 'error');
       }
     }
     setIsAdding(false);

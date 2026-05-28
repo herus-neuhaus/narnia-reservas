@@ -5,7 +5,7 @@ const supabase = createClient();
 /**
  * Busca camarotes criados para o evento e detalha sua ocupação (entradas registradas).
  */
-export async function fetchCamarotesWithOccupation(eventDate: string) {
+export async function fetchCamarotesWithOccupation(eventId: string) {
   const { data, error } = await supabase
     .from('camarotes')
     .select(`
@@ -19,7 +19,7 @@ export async function fetchCamarotesWithOccupation(eventDate: string) {
         authorized_by_user:team_members!camarote_entries_authorized_by_fkey (id, name)
       )
     `)
-    .eq('event_date', eventDate)
+    .eq('event_id', eventId)
     .order('name', { ascending: true });
 
   if (error) throw new Error(`Erro ao buscar dados de camarote: ${error.message}`);

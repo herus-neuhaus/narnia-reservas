@@ -84,9 +84,9 @@ export async function activateTicketBatch(batchId: string) {
  * Encerra a bilheteria gerando um snapshot dos lotes e cortesias,
  * e calculando receitas totais de forma segura e transacional no BD.
  */
-export async function closeBoxOffice(eventDate: string) {
+export async function closeBoxOffice(eventId: string) {
   const { data, error } = await supabase
-    .rpc('close_box_office', { p_event_date: eventDate });
+    .rpc('close_box_office', { p_event_id: eventId });
 
   if (error) throw new Error(`Erro ao encerrar bilheteria: ${error.message}`);
   
@@ -101,14 +101,14 @@ export async function closeBoxOffice(eventDate: string) {
 /**
  * Busca o relatório de fechamento de bilheteria de uma data, se existir.
  */
-export async function fetchBoxOfficeReport(eventDate: string) {
+export async function fetchBoxOfficeReport(eventId: string) {
   const { data, error } = await supabase
     .from('box_office_reports')
     .select(`
       *,
       closed_by_user:team_members!box_office_reports_closed_by_fkey (id, name)
     `)
-    .eq('event_date', eventDate)
+    .eq('event_id', eventId)
     .maybeSingle();
 
   if (error) throw new Error(`Erro ao buscar relatório da bilheteria: ${error.message}`);

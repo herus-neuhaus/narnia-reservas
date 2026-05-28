@@ -13,6 +13,7 @@ type EventRow = Database['public']['Tables']['events']['Row'] & {
   banner_url?: string | null;
   visible_from?: string | null;
   available_camarotes?: string[] | null;
+  available_mesas?: number | null;
 };
 
 export default function EventsManager() {
@@ -43,6 +44,11 @@ export default function EventsManager() {
   const [editingVisibleFrom, setEditingVisibleFrom] = useState<string>('');
   const [isUpdatingVisibleFrom, setIsUpdatingVisibleFrom] = useState<boolean>(false);
 
+  // States for inline editing of available mesas
+  const [editingMesasId, setEditingMesasId] = useState<string | null>(null);
+  const [editingMesas, setEditingMesas] = useState<string>('');
+  const [isUpdatingMesas, setIsUpdatingMesas] = useState<boolean>(false);
+
   const [formData, setFormData] = useState({
     name: '',
     event_date: '',
@@ -53,6 +59,7 @@ export default function EventsManager() {
     visible_from: '',
     banner_url: '',
     available_camarotes: ['C1', 'C2', 'C3'],
+    available_mesas: '40',
     image_file: null as File | null
   });
 
@@ -132,7 +139,8 @@ export default function EventsManager() {
           list_limit_time: formData.list_limit_time ? new Date(formData.list_limit_time).toISOString() : null,
           banner_url: formData.banner_url,
           visible_from: formData.visible_from ? new Date(formData.visible_from).toISOString() : null,
-          available_camarotes: formData.available_camarotes
+          available_camarotes: formData.available_camarotes,
+          available_mesas: formData.available_mesas
         })
       });
 
@@ -152,6 +160,7 @@ export default function EventsManager() {
         visible_from: '',
         banner_url: '', 
         available_camarotes: ['C1', 'C2', 'C3'],
+        available_mesas: '40',
         image_file: null 
       });
       fetchEvents();
@@ -268,6 +277,35 @@ export default function EventsManager() {
     }
   };
 
+  const handleSaveMesas = async (id: string) => {
+    setIsUpdatingMesas(true);
+    try {
+      const mesasVal = editingMesas === '' ? 40 : parseInt(editingMesas, 10);
+      if (isNaN(mesasVal) || mesasVal < 0) {
+        throw new Error('Mesas deve ser um número maior ou igual a zero.');
+      }
+      const mesasArray = Array.from({ length: mesasVal }, (_, i) => `M${i + 1}`);
+      const { data, error } = await supabase
+        .from('events')
+        .update({ available_mesas: mesasArray })
+        .eq('id', id)
+        .select();
+
+      if (error) throw error;
+      if (!data || data.length === 0) throw new Error('Não foi possível atualizar (permissão negada ou evento não encontrado).');
+      
+      setEditingMesasId(null);
+      
+      // Update local state directly
+      setEvents(prev => prev.map(ev => ev.id === id ? { ...ev, available_mesas: mesasArray } : ev));
+    } catch (error: any) {
+      console.error('Erro ao atualizar mesas disponíveis:', error);
+      alert('Erro ao atualizar mesas disponíveis: ' + (error.message || 'Erro desconhecido.'));
+    } finally {
+      setIsUpdatingMesas(false);
+    }
+  };
+
   const handleDelete = async (id: string) => {
     if (!confirm('Deseja realmente excluir este evento?')) return;
     
@@ -349,7 +387,17 @@ export default function EventsManager() {
                 className="w-full px-6 py-4 bg-[#0d0d0d] border border-zinc-800 rounded-2xl outline-none focus:border-[#d4af37] focus:ring-1 focus:ring-[#d4af37] transition-all text-white font-bold"
               />
             </div>
-            <div className="lg:col-span-5">
+            <div>
+              <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400 ml-4 mb-1 block">Total de Mesas</label>
+              <input 
+                type="number" 
+                value={formData.available_mesas}
+                onChange={e => setFormData({...formData, available_mesas: e.target.value})}
+                placeholder="Ex: 40"
+                className="w-full px-6 py-4 bg-[#0d0d0d] border border-zinc-800 rounded-2xl outline-none focus:border-[#d4af37] focus:ring-1 focus:ring-[#d4af37] transition-all text-white font-bold"
+              />
+            </div>
+            <div className="lg:col-span-6">
               <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400 ml-4 mb-1 block">Início da Lista e Reservas (Data e Hora que aparece no site)</label>
               <input 
                 type="datetime-local" 
@@ -677,6 +725,56 @@ export default function EventsManager() {
                           }}
                           className="p-1.5 bg-white/5 hover:bg-[#D4AF37] hover:text-black text-white/60 rounded-lg transition-all border border-white/10"
                           title="Editar Limite"
+                        >
+                          <Edit2 size={10} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Available Mesas Section with inline editing */}
+                  <div className="flex items-center justify-between border-t border-white/5 pt-4">
+                    <div className="flex items-center gap-2">
+                      <LayoutDashboard size={14} className="text-[#D4AF37]" />
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-white/40">Mesas Disponíveis</span>
+                    </div>
+                    {editingMesasId === event.id ? (
+                      <div className="flex items-center gap-1.5 animate-in fade-in duration-200">
+                        <input 
+                          type="number" 
+                          value={editingMesas}
+                          onChange={e => setEditingMesas(e.target.value)}
+                          placeholder="40"
+                          className="px-3 py-1.5 bg-black border border-white/20 rounded-xl text-xs font-bold text-white outline-none focus:border-[#D4AF37] w-24"
+                        />
+                        <button 
+                          onClick={() => handleSaveMesas(event.id)}
+                          disabled={isUpdatingMesas}
+                          className="p-2 bg-[#D4AF37] text-black rounded-xl hover:bg-[#b8962f] active:scale-95 transition-all"
+                          title="Salvar"
+                        >
+                          {isUpdatingMesas ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check size={12} />}
+                        </button>
+                        <button 
+                          onClick={() => setEditingMesasId(null)}
+                          className="p-2 bg-white/5 hover:bg-white/10 text-white rounded-xl active:scale-95 transition-all border border-white/10"
+                          title="Cancelar"
+                        >
+                          <X size={12} />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-black text-white">
+                          {event.available_mesas?.length ?? 40}
+                        </span>
+                        <button 
+                          onClick={() => {
+                            setEditingMesasId(event.id);
+                            setEditingMesas(String(event.available_mesas?.length ?? 40));
+                          }}
+                          className="p-1.5 bg-white/5 hover:bg-[#D4AF37] hover:text-black text-white/60 rounded-lg transition-all border border-white/10"
+                          title="Editar Mesas"
                         >
                           <Edit2 size={10} />
                         </button>

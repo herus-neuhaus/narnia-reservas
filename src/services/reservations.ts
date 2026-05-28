@@ -41,11 +41,11 @@ export async function fetchReservationsByDateRange(startDate: string, endDate: s
   }));
 }
 
-export async function fetchTodaysReservations(today: string): Promise<FormattedReservation[]> {
+export async function fetchEventReservations(eventId: string): Promise<FormattedReservation[]> {
   const { data, error } = await supabase
     .from('reservations')
     .select('*, customers(*)')
-    .eq('reservation_date', today);
+    .eq('event_id', eventId);
 
   if (error) throw error;
 
@@ -205,7 +205,7 @@ export async function registerBraceletEntry(params: {
   whatsapp: string;
   birthDate: string;
   photo: string | null;
-  eventDate: string;
+  eventId: string;
 }) {
   let finalPhotoUrl = params.photo || '';
   
@@ -221,7 +221,7 @@ export async function registerBraceletEntry(params: {
     p_whatsapp: params.whatsapp,
     p_birth_date: params.birthDate,
     p_photo: finalPhotoUrl,
-    p_event_date: params.eventDate
+    p_event_id: params.eventId
   });
 
   if (error) throw error;

@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
     const supabaseAdmin = createAdminClient(supabaseUrl, supabaseServiceKey);
 
     const body = await req.json();
-    const { title, date, description, start_time, list_limit_capacity, list_limit_time, banner_url, visible_from, available_camarotes } = body;
+    const { title, date, description, start_time, list_limit_capacity, list_limit_time, banner_url, visible_from, available_camarotes, available_mesas } = body;
 
     if (!title || !date) {
       return NextResponse.json(
@@ -57,7 +57,8 @@ export async function POST(req: NextRequest) {
           banner_url,
           image_url: banner_url,
           visible_from: visible_from || null,
-          available_camarotes: available_camarotes || ['C1', 'C2', 'C3']
+          available_camarotes: available_camarotes || ['C1', 'C2', 'C3'],
+          available_mesas: Array.from({ length: available_mesas !== undefined && available_mesas !== '' ? parseInt(available_mesas, 10) : 40 }, (_, i) => `M${i + 1}`)
         }
       ])
       .select()
