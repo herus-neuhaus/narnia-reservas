@@ -7,12 +7,24 @@ export function createClient() {
   // Se as variáveis estiverem ausentes (como durante o build do Vercel),
   // fornecemos valores temporários para evitar que o @supabase/ssr quebre o build.
   // No runtime, as variáveis reais devem ser configuradas no painel do Vercel.
+  const fetchOptions = {
+    global: {
+      fetch: (...args: Parameters<typeof fetch>) => {
+        return fetch(args[0], {
+          ...args[1],
+          cache: 'no-store',
+        });
+      },
+    },
+  };
+
   if (!supabaseUrl || !supabaseKey) {
     return createBrowserClient(
       'https://placeholder-url.supabase.co',
-      'placeholder-key'
+      'placeholder-key',
+      fetchOptions
     );
   }
 
-  return createBrowserClient(supabaseUrl, supabaseKey);
+  return createBrowserClient(supabaseUrl, supabaseKey, fetchOptions);
 }

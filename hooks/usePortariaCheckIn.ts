@@ -80,7 +80,7 @@ export function usePortariaCheckIn() {
     };
     initEvent();
 
-    const todayString = getPortoVelhoTime().split('T')[0];
+    const todayString = getPortoVelhoTime().split(' ')[0];
     supabase
       .from('events')
       .select('*')

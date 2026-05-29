@@ -24,6 +24,7 @@ export default function EditCustomerModal({ isOpen, onClose, customerData, onSuc
 
   useEffect(() => {
     if (customerData && isOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setFormData({
         name: customerData.name || '',
         whatsapp: customerData.whatsapp || '',
