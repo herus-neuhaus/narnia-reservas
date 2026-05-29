@@ -17,12 +17,14 @@ import ComplimentaryWidget from './components/ComplimentaryWidget';
 import CamaroteWidget from './components/CamaroteWidget';
 import CheckInPhotoModal from './components/PhotoCaptureModal';
 import ProfilePhotoModal from '@/app/components/PhotoCaptureModal';
+import EditCustomerModal from '@/app/components/EditCustomerModal';
 import { usePortariaCheckIn } from '@/hooks/usePortariaCheckIn';
 import { useRouter } from 'next/navigation';
 
 export default function PortariaDashboard() {
   const router = useRouter();
   const [profilePhotoModalData, setProfilePhotoModalData] = React.useState<any>(null);
+  const [editingCustomer, setEditingCustomer] = React.useState<any>(null);
   const {
     loading,
     searchTerm,
@@ -156,6 +158,8 @@ export default function PortariaDashboard() {
           isReceptionist={isReceptionist}
           onCheckInClick={handleCheckInClick}
           onPhotoClick={(res) => setProfilePhotoModalData(res)}
+          isAdmin={isAdmin}
+          onEditClick={(res) => setEditingCustomer({ ...res, id: res.customer_id })}
         />
 
         <PortariaCounters
@@ -203,6 +207,8 @@ export default function PortariaDashboard() {
               onQuickAddClick={() => setShowQuickAdd(true)}
               onCheckInClick={handleCheckInClick}
               onPhotoClick={(res) => setProfilePhotoModalData(res)}
+              isAdmin={isAdmin}
+              onEditClick={(res) => setEditingCustomer({ ...res, id: res.customer_id })}
             />
           </div>
           
@@ -277,6 +283,16 @@ export default function PortariaDashboard() {
             updateCustomerPhotoLocally(profilePhotoModalData.customer_id, newPhoto);
           }
           setProfilePhotoModalData(null);
+        }}
+      />
+
+      {/* Edit Customer Modal */}
+      <EditCustomerModal
+        isOpen={!!editingCustomer}
+        onClose={() => setEditingCustomer(null)}
+        customerData={editingCustomer}
+        onSuccess={() => {
+          fetchTodaysData(selectedDate);
         }}
       />
 

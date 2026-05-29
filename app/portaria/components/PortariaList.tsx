@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { UserPlus, Ticket, CalendarDays, Clock, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { UserPlus, Ticket, CalendarDays, Clock, CheckCircle2, AlertCircle, Loader2, Pencil } from 'lucide-react';
 import { formatToBrlDateTime } from '@/lib/utils';
 
 interface PortariaListProps {
@@ -12,6 +12,8 @@ interface PortariaListProps {
   onQuickAddClick: () => void;
   onCheckInClick: (id: string, currentStatus: string | null) => void;
   onPhotoClick: (reservation: any) => void;
+  isAdmin?: boolean;
+  onEditClick?: (customer: any) => void;
 }
 
 export default function PortariaList({
@@ -21,7 +23,9 @@ export default function PortariaList({
   isReceptionist,
   onQuickAddClick,
   onCheckInClick,
-  onPhotoClick
+  onPhotoClick,
+  isAdmin,
+  onEditClick
 }: PortariaListProps) {
   return (
     <div className="bg-[#0A0A0A] rounded-[40px] border border-white/10 overflow-hidden shadow-2xl">
@@ -64,7 +68,18 @@ export default function PortariaList({
                   )}
                 </button>
                 <div>
-                  <h4 className="font-bold text-sm leading-tight">{res.name}</h4>
+                  <div className="flex items-center gap-2">
+                    <h4 className="font-bold text-sm leading-tight">{res.name}</h4>
+                    {isAdmin && onEditClick && (
+                      <button 
+                        onClick={() => onEditClick(res)}
+                        className="p-1.5 bg-white/5 text-white/30 hover:text-[#D4AF37] hover:bg-[#D4AF37]/10 rounded-lg transition-all"
+                        title="Editar Cliente"
+                      >
+                        <Pencil size={12} />
+                      </button>
+                    )}
+                  </div>
                   <div className="flex gap-3 mt-1 items-center">
                     <span className="text-[10px] font-bold uppercase tracking-tighter text-white/30">{res.cpf || 'Sem CPF'}</span>
                     <span className="text-[10px] font-bold uppercase tracking-tighter text-[#D4AF37]/60">

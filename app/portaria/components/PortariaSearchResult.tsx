@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { ShieldAlert, UserCheck, Clock } from 'lucide-react';
+import { ShieldAlert, UserCheck, Clock, Pencil } from 'lucide-react';
 import { differenceInDays, parseISO } from 'date-fns';
 import { formatToBrlDateTime } from '@/lib/utils';
 
@@ -11,6 +11,8 @@ interface PortariaSearchResultProps {
   isReceptionist: boolean;
   onCheckInClick: (id: string, currentStatus: string | null) => void;
   onPhotoClick: (reservation: any) => void;
+  isAdmin?: boolean;
+  onEditClick?: (customer: any) => void;
 }
 
 export default function PortariaSearchResult({
@@ -18,7 +20,9 @@ export default function PortariaSearchResult({
   isBlacklisted,
   isReceptionist,
   onCheckInClick,
-  onPhotoClick
+  onPhotoClick,
+  isAdmin,
+  onEditClick
 }: PortariaSearchResultProps) {
   if (!searchResult && !isBlacklisted) return null;
 
@@ -59,7 +63,18 @@ export default function PortariaSearchResult({
               </button>
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-widest opacity-60">Reserva Encontrada</p>
-                <h2 className="text-3xl font-bold tracking-tight">{searchResult.name}</h2>
+                <div className="flex items-center gap-3">
+                  <h2 className="text-3xl font-bold tracking-tight">{searchResult.name}</h2>
+                  {isAdmin && onEditClick && (
+                    <button 
+                      onClick={() => onEditClick(searchResult)}
+                      className="p-2 bg-black/10 text-black/40 hover:text-black hover:bg-black/20 rounded-xl transition-all"
+                      title="Editar Cliente"
+                    >
+                      <Pencil size={18} />
+                    </button>
+                  )}
+                </div>
                 <div className="flex gap-4 mt-2">
                   <span className="text-xs font-bold uppercase tracking-tighter bg-black/10 px-2 py-0.5 rounded">{searchResult.type} {searchResult.location_id}</span>
                   <span className="text-xs font-bold uppercase tracking-tighter bg-black/10 px-2 py-0.5 rounded">{searchResult.num_guests} Pessoas</span>

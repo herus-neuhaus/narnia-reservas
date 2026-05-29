@@ -37,15 +37,16 @@ export async function fetchReservationsByDateRange(startDate: string, endDate: s
     name: res.customers?.name || res.name,
     cpf: res.customers?.cpf || res.cpf,
     whatsapp: res.customers?.whatsapp || res.whatsapp,
+    birth_date: res.customers?.birth_date || res.birth_date,
     photo: res.customers?.photo || res.photo
   }));
 }
 
-export async function fetchEventReservations(eventId: string): Promise<FormattedReservation[]> {
+export async function fetchEventReservations(eventDate: string): Promise<FormattedReservation[]> {
   const { data, error } = await supabase
     .from('reservations')
     .select('*, customers(*)')
-    .eq('event_id', eventId);
+    .eq('reservation_date', eventDate);
 
   if (error) throw error;
 
@@ -56,6 +57,7 @@ export async function fetchEventReservations(eventId: string): Promise<Formatted
     name: res.customers?.name || res.name,
     cpf: res.customers?.cpf || res.cpf,
     whatsapp: res.customers?.whatsapp || res.whatsapp,
+    birth_date: res.customers?.birth_date || res.birth_date,
     photo: res.customers?.photo || res.photo
   })).sort((a, b) => {
     const nameA = a.name || '';
@@ -205,7 +207,7 @@ export async function registerBraceletEntry(params: {
   whatsapp: string;
   birthDate: string;
   photo: string | null;
-  eventId: string;
+  eventDate: string;
 }) {
   let finalPhotoUrl = params.photo || '';
   
@@ -221,7 +223,7 @@ export async function registerBraceletEntry(params: {
     p_whatsapp: params.whatsapp,
     p_birth_date: params.birthDate,
     p_photo: finalPhotoUrl,
-    p_event_id: params.eventId
+    p_event_date: params.eventDate
   });
 
   if (error) throw error;

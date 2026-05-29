@@ -12,16 +12,18 @@ import {
   History, 
   Smartphone, 
   AlertTriangle,
-  Award,
   CheckCircle,
   XCircle,
-  Loader2
+  Loader2,
+  Pencil,
+  Award
 } from 'lucide-react';
 import { format, parseISO, differenceInYears } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 import { useClients } from '../hooks/useClients';
 import { ClientRecord } from '../types/clients.types';
+import EditCustomerModal from '@/app/components/EditCustomerModal';
 
 interface ClientsManagerProps {
   onBlockRequest?: (client: { cpf: string; name: string }) => void;
@@ -37,10 +39,12 @@ export default function ClientsManager({ onBlockRequest }: ClientsManagerProps =
     filterType,
     setFilterType,
     sortBy,
-    setSortBy
+    setSortBy,
+    refetch
   } = useClients();
 
   const [expandedCpf, setExpandedCpf] = useState<string | null>(null);
+  const [editingCustomer, setEditingCustomer] = useState<{ id: string; cpf: string; name: string; whatsapp: string; birth_date: string | null } | null>(null);
 
   const formatToBrlDateTime = (dateStr: string | null) => {
     if (!dateStr) return '';
@@ -199,6 +203,22 @@ export default function ClientsManager({ onBlockRequest }: ClientsManagerProps =
                     <div className="space-y-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <h3 className="text-lg font-bold tracking-tight">{client.name}</h3>
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingCustomer({
+                              id: client.id || '',
+                              cpf: client.cpf,
+                              name: client.name,
+                              whatsapp: client.whatsapp,
+                              birth_date: client.birth_date
+                            });
+                          }}
+                          className="p-1.5 bg-white/5 text-white/30 hover:text-[#D4AF37] hover:bg-[#D4AF37]/10 rounded-lg transition-all"
+                          title="Editar Cliente"
+                        >
+                          <Pencil size={14} />
+                        </button>
                         {client.isBlacklisted && (
                           <span className="px-2 py-0.5 bg-red-500/10 text-red-500 border border-red-500/20 text-[9px] font-black uppercase rounded-md tracking-widest">
                             BLACKLIST
@@ -412,6 +432,15 @@ export default function ClientsManager({ onBlockRequest }: ClientsManagerProps =
           })
         )}
       </div>
+
+      <EditCustomerModal
+        isOpen={!!editingCustomer}
+        onClose={() => setEditingCustomer(null)}
+        customerData={editingCustomer}
+        onSuccess={() => {
+          refetch();
+        }}
+      />
     </div>
   );
 }

@@ -119,7 +119,7 @@ export function usePortariaCheckIn() {
       setIsAdmin(['dono', 'gerente', 'admin'].includes(role) || email === 'narnia@admin.com');
       setIsReceptionist(role === 'receptionist');
 
-      const mappedResData = await fetchEventReservations(selectedEvent.id);
+      const mappedResData = await fetchEventReservations(selectedDate);
       const blData = await fetchBlacklistEntries();
 
       setReservations(mappedResData);

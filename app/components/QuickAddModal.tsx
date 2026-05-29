@@ -199,7 +199,7 @@ export default function QuickAddModal({
           whatsapp: quickFormData.whatsapp,
           birthDate: toIsoDate(quickFormData.birth_date),
           photo: finalPhotoUrl,
-          eventId: event?.id
+          eventDate: selectedDate
         });
         
         if (braceletRes?.success) {
@@ -299,8 +299,7 @@ export default function QuickAddModal({
       p_type: quickFormData.type,
       p_location_id: quickFormData.type === 'mesa' ? quickFormData.location_id : null,
       p_notes: '',
-      p_expires_at: null,
-      p_event_id: event?.id
+      p_expires_at: null
     });
 
     if (!error) {

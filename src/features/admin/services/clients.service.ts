@@ -44,6 +44,7 @@ export const clientsService = {
       });
 
       return {
+        id: c.id,
         cpf: c.cpf || '',
         name: c.name,
         whatsapp: c.whatsapp,

@@ -1,4 +1,5 @@
 export interface ClientRecord {
+  id?: string;
   cpf: string;
   name: string;
   whatsapp: string;
