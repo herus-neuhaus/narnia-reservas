@@ -49,7 +49,7 @@ export default function BoxOfficeTabs({ event }: { event: any }) {
         fetchComplimentaryTickets(event.id),
         fetchCamarotesWithOccupation(event.id),
         fetchBoxOfficeReport(event.id),
-        fetchEventReservations(event.id)
+        fetchEventReservations(event.event_date)
       ]);
       setBatches(bData);
       setComplimentary(cData);
