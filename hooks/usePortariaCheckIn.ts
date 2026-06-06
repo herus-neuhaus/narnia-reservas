@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { format, startOfToday, parseISO, differenceInDays } from 'date-fns';
+import { format, startOfToday, parseISO, differenceInDays, subDays } from 'date-fns';
 import { createClient } from '@/lib/supabase/client';
 import { 
   fetchEventReservations, 
@@ -81,16 +81,18 @@ export function usePortariaCheckIn() {
     initEvent();
 
     const todayString = getPortoVelhoTime().split(' ')[0];
+    const yesterdayString = format(subDays(parseISO(todayString), 1), 'yyyy-MM-dd');
     supabase
       .from('events')
       .select('*')
-      .gte('event_date', todayString)
+      .gte('event_date', yesterdayString)
       .order('event_date', { ascending: true })
       .limit(10)
       .then(({data}) => {
         if (data) setAvailableEvents(data);
       });
-  }, [supabase]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleSelectEvent = (ev: any) => {
     setSelectedEvent(ev);

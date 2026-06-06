@@ -245,7 +245,7 @@ export default function QuickAddModal({
       // Note: If you want to update the photo of a camarote guest, you need to do it after or modify the RPC.
       // Doing an additional update to customers table here just in case:
       if (!error && finalPhotoUrl && finalPhotoUrl.startsWith('http')) {
-         await supabase.from('customers').update({ photo: finalPhotoUrl }).eq('cpf', quickFormData.cpf.replace(/\D/g, ''));
+         await supabase.from('customers').update({ photo: finalPhotoUrl }).eq('cpf_digits', quickFormData.cpf.replace(/\D/g, ''));
       }
 
       if (error) {
@@ -303,7 +303,20 @@ export default function QuickAddModal({
     });
 
     if (!error) {
-      onSuccess(data);
+      if (finalPhotoUrl && finalPhotoUrl.startsWith('http')) {
+         await supabase.from('customers').update({ photo: finalPhotoUrl }).eq('cpf_digits', quickFormData.cpf.replace(/\D/g, ''));
+      }
+      onSuccess({
+        name: quickFormData.name,
+        cpf: quickFormData.cpf,
+        whatsapp: quickFormData.whatsapp,
+        type: quickFormData.type,
+        location_id: quickFormData.type === 'mesa' ? quickFormData.location_id : null,
+        check_in_status: 'pending',
+        reservation_date: today,
+        reservation_time: '22:00',
+        photo: finalPhotoUrl
+      });
       setQuickFormData({ name: '', cpf: '', birth_date: '', whatsapp: '', type: 'pulseira', location_id: '', photo: null });
       onClose();
     } else {
