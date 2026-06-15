@@ -370,6 +370,7 @@ export default function EventsManager() {
             </div>
             <div>
               <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400 ml-4 mb-1 block">Limite da Lista</label>
+              <p className="text-[9px] text-white/40 ml-4 mb-2">Horário limite para entrada com Nome na Lista.</p>
               <input 
                 type="datetime-local" 
                 value={formData.list_limit_time}
@@ -379,6 +380,7 @@ export default function EventsManager() {
             </div>
             <div>
               <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400 ml-4 mb-1 block">Capacidade da Lista</label>
+              <p className="text-[9px] text-white/40 ml-4 mb-2">Máximo de pessoas que podem pegar cortesia pelo site.</p>
               <input 
                 type="number" 
                 value={formData.list_limit_capacity}
@@ -389,6 +391,7 @@ export default function EventsManager() {
             </div>
             <div>
               <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400 ml-4 mb-1 block">Total de Mesas</label>
+              <p className="text-[9px] text-white/40 ml-4 mb-2">Quantas mesas estão disponíveis para o público.</p>
               <input 
                 type="number" 
                 value={formData.available_mesas}
@@ -399,6 +402,7 @@ export default function EventsManager() {
             </div>
             <div className="lg:col-span-6">
               <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400 ml-4 mb-1 block">Início da Lista e Reservas (Data e Hora que aparece no site)</label>
+              <p className="text-[9px] text-white/40 ml-4 mb-2">Quando as opções de lista/mesa ficarão ativas para o cliente.</p>
               <input 
                 type="datetime-local" 
                 value={formData.visible_from}
@@ -410,6 +414,7 @@ export default function EventsManager() {
           
           <div>
             <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400 ml-4 mb-1 block">Descrição / Atrações</label>
+            <p className="text-[9px] text-white/40 ml-4 mb-2">Texto que aparece na página do evento. Útil para line-up e regras.</p>
             <textarea 
               value={formData.description}
               onChange={e => setFormData({...formData, description: e.target.value})}

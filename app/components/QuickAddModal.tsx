@@ -220,7 +220,7 @@ export default function QuickAddModal({
           showAlert('Erro ao registrar', braceletRes?.message || 'Erro desconhecido.', 'error');
         }
       } catch (err: any) {
-        showAlert('Erro', 'Não foi possível registrar a pulseira.', 'error');
+        showAlert('Erro', err?.message || 'Não foi possível registrar a pulseira.', 'error');
       }
       setIsAdding(false);
       return;
@@ -302,7 +302,7 @@ export default function QuickAddModal({
       p_expires_at: null
     });
 
-    if (!error) {
+    if (!error && (data as any)?.success) {
       if (finalPhotoUrl && finalPhotoUrl.startsWith('http')) {
          await supabase.from('customers').update({ photo: finalPhotoUrl }).eq('cpf_digits', quickFormData.cpf.replace(/\D/g, ''));
       }
@@ -320,7 +320,7 @@ export default function QuickAddModal({
       setQuickFormData({ name: '', cpf: '', birth_date: '', whatsapp: '', type: 'pulseira', location_id: '', photo: null });
       onClose();
     } else {
-      const isDuplicate = error?.code === '23505' || error?.message?.includes('duplicate') || error?.message?.includes('já possui');
+      const isDuplicate = error?.code === '23505' || error?.message?.includes('duplicate') || error?.message?.includes('já possui') || (data as any)?.message?.includes('já possui');
       if (isDuplicate) {
         onDuplicate({
           name: quickFormData.name,
@@ -356,6 +356,12 @@ export default function QuickAddModal({
               onPhotoCaptured={(photoBase64) => setQuickFormData(prev => ({ ...prev, photo: photoBase64 }))}
               initialPhoto={quickFormData.photo}
             />
+          </div>
+
+          <div className="bg-[#D4AF37]/10 border border-[#D4AF37]/30 rounded-xl p-3 mx-4 mb-2">
+            <p className="text-[10px] text-[#D4AF37] font-medium leading-relaxed">
+              <strong className="font-black">Dica:</strong> Digite o CPF primeiro para buscar os dados do cliente. Sempre verifique o documento de identificação original antes de liberar a entrada.
+            </p>
           </div>
 
           <div className="relative">
@@ -466,7 +472,7 @@ export default function QuickAddModal({
             <label className="text-[10px] font-bold uppercase tracking-widest text-white/30 ml-4 mb-1 block">Tipo de Acesso</label>
             <div className="grid grid-cols-3 gap-2">
               {[
-                { id: 'lista', label: 'Cortesia', disabled: isCortesiaExpired(event, selectedDate) },
+                { id: 'lista', label: 'Nome na Lista', disabled: isCortesiaExpired(event, selectedDate) },
                 { id: 'camarote', label: 'VIP' },
                 { id: 'pulseira', label: 'Pulseira' }
               ].map((t) => (
@@ -489,9 +495,12 @@ export default function QuickAddModal({
               ))}
             </div>
             {isCortesiaExpired(event, selectedDate) && (
-              <p className="text-[10px] text-red-500/80 mt-2 ml-4 italic">
-                O horário de cortesia ({event?.list_limit_time ? format(parseISO(event.list_limit_time), 'dd/MM HH:mm') : ''}) já encerrou. Utilize Pulseira.
-              </p>
+              <div className="mt-2 ml-4 flex items-start gap-2 bg-red-500/10 border border-red-500/20 p-2 rounded-lg mr-4">
+                <p className="text-[10px] text-red-500/90 font-medium">
+                  <strong className="block mb-0.5">⚠️ Entrada por Nome na Lista Indisponível</strong>
+                  O horário limite configurado pelo administrador ({event?.list_limit_time ? format(parseISO(event.list_limit_time), 'dd/MM HH:mm') : ''}) já encerrou. O sistema bloqueia novas entradas por lista automaticamente.
+                </p>
+              </div>
             )}
           </div>
 

@@ -79,6 +79,8 @@ export default function PortariaDashboard() {
     handleChangeEvent
   } = usePortariaCheckIn();
 
+  const [showTipsModal, setShowTipsModal] = useState(false);
+
   const stats = getFilteredStats();
 
   return (
@@ -110,8 +112,14 @@ export default function PortariaDashboard() {
       )}
 
       <div className="flex flex-col sm:flex-row sm:justify-between items-start sm:items-center px-4 lg:px-8 py-4 bg-[#0A0A0A] border-b border-white/10 gap-3 sm:gap-0">
-        <div className="flex items-center justify-between w-full sm:w-auto">
+        <div className="flex items-center justify-between w-full sm:w-auto gap-4">
           <h1 className="text-lg lg:text-xl font-black text-[#D4AF37] tracking-widest uppercase">PORTARIA NÁRNIA</h1>
+          <button 
+            onClick={() => setShowTipsModal(true)} 
+            className="text-[10px] font-bold text-[#D4AF37] uppercase tracking-widest bg-[#D4AF37]/10 px-3 py-1.5 rounded-lg flex items-center gap-1 hover:bg-[#D4AF37]/20 transition-all"
+          >
+            <AlertCircle size={14} /> Dicas
+          </button>
           <button onClick={handleLogout} className="sm:hidden text-[10px] font-bold text-red-500 uppercase tracking-widest bg-red-500/10 px-3 py-1.5 rounded-lg">Sair</button>
         </div>
 
@@ -137,6 +145,37 @@ export default function PortariaDashboard() {
 
       <main className="p-4 lg:p-8 max-w-5xl mx-auto space-y-6 pb-24">
         
+        {/* Tips Modal */}
+        {showTipsModal && (
+          <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm animate-in fade-in">
+            <div className="w-full max-w-md bg-[#0A0A0A] rounded-[32px] border border-[#D4AF37]/30 p-6 shadow-2xl relative">
+              <button onClick={() => setShowTipsModal(false)} className="absolute top-4 right-4 text-white/40 hover:text-white transition-colors">
+                <XCircle size={24} />
+              </button>
+              <h3 className="text-lg font-black uppercase text-[#D4AF37] mb-4 flex items-center gap-2">
+                <AlertCircle size={20} /> Regras e Dicas da Portaria
+              </h3>
+              <ul className="space-y-3 text-xs text-white/80 leading-relaxed">
+                <li className="bg-white/5 p-3 rounded-xl border border-white/10">
+                  <strong className="text-white block mb-1">Idade Mínima:</strong> Menores de 18 anos são bloqueados automaticamente pelo sistema pelo CPF.
+                </li>
+                <li className="bg-white/5 p-3 rounded-xl border border-white/10">
+                  <strong className="text-white block mb-1">Duplicidade de Entrada:</strong> Se o cliente já deu entrada hoje, o sistema avisará ao tentar registrar a pulseira novamente, prevenindo fraudes.
+                </li>
+                <li className="bg-white/5 p-3 rounded-xl border border-white/10">
+                  <strong className="text-white block mb-1">Camarotes Extra:</strong> Camarote cheio? O botão de adicionar convidado ficará bloqueado e apenas o administrador (ou gerente) poderá autorizar entrada EXTRA.
+                </li>
+                <li className="bg-white/5 p-3 rounded-xl border border-white/10">
+                  <strong className="text-white block mb-1">Nomes na Lista por Horário:</strong> Preste atenção ao aviso vermelho no Cadastro Rápido. Se o horário limite configurado já passou, entradas por Nome na Lista são bloqueadas automaticamente e você deve oferecer a Pulseira.
+                </li>
+              </ul>
+              <button onClick={() => setShowTipsModal(false)} className="w-full mt-6 py-4 bg-[#D4AF37] text-black font-black uppercase tracking-widest rounded-2xl hover:bg-[#b8962f] transition-all">
+                Entendi
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Main Search Bar */}
         <div className="relative group">
           <div className="absolute inset-y-0 left-5 flex items-center pointer-events-none">

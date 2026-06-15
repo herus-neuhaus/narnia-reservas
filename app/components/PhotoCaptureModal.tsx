@@ -4,6 +4,8 @@ import React, { useState } from 'react';
 import { XCircle, Loader2, CheckCircle2 } from 'lucide-react';
 import CameraCapture from './CameraCapture';
 import { createClient } from '@/lib/supabase/client';
+import CustomAlertDialog from './CustomAlertDialog';
+import { useCustomAlert } from '@/hooks/use-custom-alert';
 
 interface PhotoCaptureModalProps {
   isOpen: boolean;
@@ -24,6 +26,7 @@ export default function PhotoCaptureModal({
 }: PhotoCaptureModalProps) {
   const [photo, setPhoto] = useState<string | null>(initialPhoto || null);
   const [isUploading, setIsUploading] = useState(false);
+  const { showAlert, alertProps } = useCustomAlert();
   const supabase = createClient();
 
   const handleSave = async () => {
@@ -54,7 +57,7 @@ export default function PhotoCaptureModal({
       onClose();
     } catch (error: any) {
       console.error(error);
-      alert('Erro ao salvar foto: ' + error.message);
+      showAlert('Erro', 'Erro ao salvar foto: ' + error.message, 'error');
     } finally {
       setIsUploading(false);
     }
@@ -98,6 +101,7 @@ export default function PhotoCaptureModal({
             </>
           )}
         </button>
+        <CustomAlertDialog {...alertProps} />
       </div>
     </div>
   );
