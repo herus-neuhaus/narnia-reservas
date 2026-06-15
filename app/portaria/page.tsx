@@ -2,8 +2,8 @@
 
 export const dynamic = 'force-dynamic';
 
-import React from 'react';
-import { Search, ShieldAlert, Smartphone } from 'lucide-react';
+import React, { useState } from 'react';
+import { Search, ShieldAlert, Smartphone, AlertCircle, XCircle } from 'lucide-react';
 import { differenceInDays, parseISO } from 'date-fns';
 import { formatToBrlDateTime } from '@/lib/utils';
 import QuickAddModal from '@/app/components/QuickAddModal';
